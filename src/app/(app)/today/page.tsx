@@ -14,7 +14,7 @@ import type { ActiveProgram } from '@/store/app-store'
 export default function TodayPage() {
   const router = useRouter()
   const { activeProgram, setActiveProgram } = useAppStore()
-  const { sets, paceInputs, notes, setNotes, sessionLogged, sessionId, markLogged, reset } = useSessionStore()
+  const { sets, paceInputs, notes, setNotes, sessionLogged, sessionId, markLogged, clearLogged, reset, resetIfStale } = useSessionStore()
   const [loading, setLoading] = useState(true)
   const [logging, setLogging] = useState(false)
   const [skipping, setSkipping] = useState(false)
@@ -34,14 +34,20 @@ export default function TodayPage() {
       if (res.status === 401) { router.push('/login'); return }
       const data: ActiveProgram & { todaySession: { id: string; status: string } | null } = await res.json()
       setActiveProgram(data)
-      // If today is already logged and not undone, mark state
+      // Reset persisted set state if it's bound to a different day or workout
+      if (data.todayWorkout) {
+        resetIfStale(date, data.todayWorkout.id)
+      }
+      // Sync sessionLogged flag with server truth
       if (data.todaySession && data.todaySession.status !== 'undone' && data.todaySession.status !== 'skipped') {
         markLogged(data.todaySession.id)
+      } else {
+        clearLogged()
       }
     } finally {
       setLoading(false)
     }
-  }, [router, setActiveProgram, markLogged])
+  }, [router, setActiveProgram, markLogged, clearLogged, resetIfStale])
 
   useEffect(() => {
     loadProgram()
@@ -145,6 +151,10 @@ export default function TodayPage() {
   function handleLogSessionClick() {
     if (allComplete) {
       doLogSession(false)
+    } else if (completedSets === 0) {
+      // Nothing checked — treat as a skip directly. Avoids creating an
+      // empty 'partial' session row indistinguishable from a skip.
+      handleSkip()
     } else {
       setShowPartialConfirm(true)
     }

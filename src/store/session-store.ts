@@ -11,6 +11,9 @@ export type SetState = {
 type ExerciseSets = Record<number, SetState> // set_number → state
 
 type SessionState = {
+  // Bound to a specific date + workout — guards against stale carryover
+  dateKey: string | null
+  workoutDayId: string | null
   // Keyed by exercise id
   sets: Record<string, ExerciseSets>
   paceInputs: Record<string, string> // exercise_id → pace string
@@ -22,11 +25,15 @@ type SessionState = {
   setPace: (exerciseId: string, pace: string) => void
   setNotes: (notes: string) => void
   markLogged: (sessionId: string) => void
+  clearLogged: () => void
   reset: () => void
+  resetIfStale: (dateKey: string, workoutDayId: string) => void
   initExercise: (exerciseId: string, sets: number) => void
 }
 
 const initialState = {
+  dateKey: null,
+  workoutDayId: null,
   sets: {},
   paceInputs: {},
   notes: '',
@@ -80,8 +87,19 @@ export const useSessionStore = create<SessionState>()(
         set({ sessionLogged: true, sessionId })
       },
 
+      clearLogged() {
+        set({ sessionLogged: false, sessionId: null })
+      },
+
       reset() {
         set(initialState)
+      },
+
+      resetIfStale(dateKey, workoutDayId) {
+        const cur = get()
+        if (cur.dateKey !== dateKey || cur.workoutDayId !== workoutDayId) {
+          set({ ...initialState, dateKey, workoutDayId })
+        }
       },
     }),
     {

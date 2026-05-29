@@ -16,7 +16,7 @@ export async function GET() {
 
   const { data: sessions } = await supabase
     .from('sessions')
-    .select('id, date, week, status, notes, volume_lbs, workout_day_id')
+    .select('id, date, week_number, week_type, friday_alt, status, notes, volume_lbs, workout_day_id')
     .eq('program_id', program.id)
     .neq('status', 'undone')
     .order('date', { ascending: false })
@@ -34,10 +34,12 @@ export async function GET() {
     ((days ?? []) as Array<{ id: string; name: string; type: string; tag: string | null }>).map((d) => [d.id, d])
   )
 
-  const result = (sessions as Array<{ id: string; date: string; week: number; status: string; notes: string | null; volume_lbs: number | null; workout_day_id: string }>).map((s) => ({
+  const result = (sessions as Array<{ id: string; date: string; week_number: number; week_type: string; friday_alt: string | null; status: string; notes: string | null; volume_lbs: number | null; workout_day_id: string }>).map((s) => ({
     id: s.id,
     date: s.date,
-    week: s.week,
+    week: s.week_number,
+    week_type: s.week_type,
+    friday_alt: s.friday_alt,
     status: s.status,
     notes: s.notes,
     volume_lbs: s.volume_lbs,

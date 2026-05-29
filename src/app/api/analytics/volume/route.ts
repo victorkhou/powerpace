@@ -16,7 +16,7 @@ export async function GET() {
 
   const { data: sessions } = await supabase
     .from('sessions')
-    .select('date, week, volume_lbs, status')
+    .select('date, week_number, volume_lbs, status')
     .eq('program_id', program.id)
     .neq('status', 'undone')
     .neq('status', 'skipped')
@@ -25,9 +25,9 @@ export async function GET() {
   if (!sessions) return NextResponse.json([])
 
   return NextResponse.json(
-    (sessions as Array<{ date: string; week: number; volume_lbs: number | null; status: string }>).map((s) => ({
+    (sessions as Array<{ date: string; week_number: number; volume_lbs: number | null; status: string }>).map((s) => ({
       date: s.date,
-      week: s.week,
+      week: s.week_number,
       volume: s.volume_lbs ?? 0,
     }))
   )

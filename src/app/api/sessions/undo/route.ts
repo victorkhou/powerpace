@@ -53,5 +53,22 @@ export async function POST(request: NextRequest) {
   // Mark session as undone
   await db.from('sessions').update({ status: 'undone' }).eq('id', sessionId)
 
+  // If this was a Friday Week A log, the log handler advanced friday_alt.
+  // Reverse it to restore the alternation. Tuesday Week A doesn't advance,
+  // so it doesn't need a reversal.
+  const sessionDate = new Date(session.date as string)
+  const dow = sessionDate.getUTCDay()
+  if (session.week_type === 'A' && dow === 5) {
+    const { data: progRow } = await supabase
+      .from('programs')
+      .select('friday_alt')
+      .eq('id', prog.id)
+      .single<{ friday_alt: 'A1' | 'A2' }>()
+    if (progRow) {
+      const reverted = progRow.friday_alt === 'A1' ? 'A2' : 'A1'
+      await db.from('programs').update({ friday_alt: reverted }).eq('id', prog.id)
+    }
+  }
+
   return NextResponse.json({ ok: true })
 }

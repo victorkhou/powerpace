@@ -2,11 +2,13 @@
 
 import { useEffect, useState } from 'react'
 import { useAppStore } from '@/store/app-store'
+import { useSessionStore } from '@/store/session-store'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
 export default function SettingsPage() {
   const { activeProgram, setActiveProgram, clearProgram } = useAppStore()
+  const resetSession = useSessionStore((s) => s.reset)
   const router = useRouter()
   const [weekInput, setWeekInput] = useState('')
   const [saving, setSaving] = useState(false)
@@ -54,12 +56,15 @@ export default function SettingsPage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ programId: program.id, weekType: newType }),
     })
+    // Today's workout will change — clear any in-progress set state
+    resetSession()
     const res = await fetch('/api/programs/active')
     if (res.ok) setActiveProgram(await res.json())
     setSaving(false)
   }
 
   async function handleSignOut() {
+    resetSession()
     const supabase = createClient()
     await supabase.auth.signOut()
     clearProgram()
