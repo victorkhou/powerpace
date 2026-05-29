@@ -257,7 +257,7 @@ export default function TodayPage() {
             {dow === 5 ? 'Friday' : 'Tuesday'} {program?.friday_alt} active · next: {program?.friday_alt === 'A1' ? 'A2' : 'A1'}
           </div>
         )}
-        {todayWorkout && (
+        {todayWorkout && (todayWorkout.type === 'lift' || todayWorkout.type === 'combo') && (
           <div
             style={{
               marginTop: 8,
