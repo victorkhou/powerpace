@@ -60,15 +60,24 @@ export default function WeightsPage() {
   async function saveWeight(key: string, value: number) {
     if (!program) return
     setSaving(key)
-    await fetch(`/api/weights/${key}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ programId: program.id, weightLbs: value }),
-    })
-    // Refresh
-    const res = await fetch('/api/programs/active')
-    if (res.ok) setActiveProgram(await res.json())
-    setSaving(null)
+    try {
+      const res = await fetch(`/api/weights/${key}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ programId: program.id, weightLbs: value }),
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        alert(`Save failed: ${err.error ?? res.statusText}`)
+        return
+      }
+      const refresh = await fetch('/api/programs/active')
+      if (refresh.ok) setActiveProgram(await refresh.json())
+    } catch (e) {
+      alert(`Save failed: ${e instanceof Error ? e.message : 'network error'}`)
+    } finally {
+      setSaving(null)
+    }
   }
 
   function handleDoneEditing() {
@@ -143,28 +152,40 @@ export default function WeightsPage() {
             {isEditable ? (
               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                 <button
+                  disabled={saving === key}
                   onClick={() => {
                     const step = INCREMENTS[key] ?? 2.5
                     const newVal = (editValues[key] ?? ww.weight_lbs) - step
                     setEditValues({ ...editValues, [key]: newVal })
+                    saveWeight(key, newVal)
                   }}
                   style={{ width: 32, height: 32, borderRadius: 4, border: '1px solid #333', backgroundColor: '#181818', color: '#d0d0d0', fontFamily: "'DM Mono', monospace", fontSize: '0.9rem', cursor: 'pointer' }}
                 >−</button>
                 <input
                   type="number"
+                  inputMode="decimal"
                   value={editValues[key] ?? ww.weight_lbs}
                   onChange={(e) => setEditValues({ ...editValues, [key]: parseFloat(e.target.value) || 0 })}
                   onBlur={() => {
                     const val = editValues[key]
                     if (val !== undefined && val !== ww.weight_lbs) saveWeight(key, val)
                   }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      const val = editValues[key]
+                      if (val !== undefined && val !== ww.weight_lbs) saveWeight(key, val)
+                      ;(e.target as HTMLInputElement).blur()
+                    }
+                  }}
                   style={{ width: 64, height: 32, textAlign: 'center', backgroundColor: '#181818', border: '1px solid #333', borderRadius: 4, color: '#d0d0d0', fontFamily: "'DM Mono', monospace", fontSize: '0.85rem' }}
                 />
                 <button
+                  disabled={saving === key}
                   onClick={() => {
                     const step = INCREMENTS[key] ?? 2.5
                     const newVal = (editValues[key] ?? ww.weight_lbs) + step
                     setEditValues({ ...editValues, [key]: newVal })
+                    saveWeight(key, newVal)
                   }}
                   style={{ width: 32, height: 32, borderRadius: 4, border: '1px solid #333', backgroundColor: '#181818', color: '#d0d0d0', fontFamily: "'DM Mono', monospace", fontSize: '0.9rem', cursor: 'pointer' }}
                 >+</button>
