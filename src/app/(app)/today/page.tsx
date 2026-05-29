@@ -27,7 +27,10 @@ export default function TodayPage() {
   const loadProgram = useCallback(async () => {
     setLoading(true)
     try {
-      const res = await fetch('/api/programs/active')
+      const now = new Date()
+      const dow = now.getDay()
+      const date = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+      const res = await fetch(`/api/programs/active?dow=${dow}&date=${date}`)
       if (res.status === 401) { router.push('/login'); return }
       const data: ActiveProgram & { todaySession: { id: string; status: string } | null } = await res.json()
       setActiveProgram(data)
@@ -83,7 +86,8 @@ export default function TodayPage() {
     setLogging(true)
     setError(null)
     try {
-      const today = new Date().toISOString().split('T')[0]
+      const tnow = new Date()
+      const today = `${tnow.getFullYear()}-${String(tnow.getMonth() + 1).padStart(2, '0')}-${String(tnow.getDate()).padStart(2, '0')}`
       const setsPayload = exercises.flatMap((ex) => {
         const exState = sets[ex.id] ?? {}
         return Object.entries(exState).map(([setNum, s]) => ({
@@ -149,7 +153,8 @@ export default function TodayPage() {
   async function handleSkip() {
     if (!program || !todayWorkout) return
     setSkipping(true)
-    const today = new Date().toISOString().split('T')[0]
+    const snow = new Date()
+    const today = `${snow.getFullYear()}-${String(snow.getMonth() + 1).padStart(2, '0')}-${String(snow.getDate()).padStart(2, '0')}`
     await fetch('/api/sessions/skip', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

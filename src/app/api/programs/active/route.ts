@@ -1,11 +1,19 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/api-auth'
 import { seedProgram } from '@/lib/seed'
 import type { Program, WorkoutDay, Exercise, WorkingWeight } from '@/types/database'
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   const { user, supabase, error: authError } = await getAuthenticatedUser()
   if (authError || !user) return authError!
+
+  // Client passes its local day-of-week and date so we use the user's timezone,
+  // not the server's UTC. Fall back to server time if absent.
+  const url = new URL(request.url)
+  const dowParam = url.searchParams.get('dow')
+  const dateParam = url.searchParams.get('date')
+  const clientDow = dowParam !== null ? parseInt(dowParam, 10) : null
+  const clientDate = dateParam ?? null
 
   const { data: program, error: programError } = await supabase
     .from('programs')
@@ -23,21 +31,23 @@ export async function GET() {
         .eq('id', programId)
         .single()
       if (!seeded) return NextResponse.json({ error: 'Seed failed' }, { status: 500 })
-      return buildResponse(seeded as Program, supabase)
+      return buildResponse(seeded as Program, supabase, clientDow, clientDate)
     } catch (e) {
       return NextResponse.json({ error: String(e) }, { status: 500 })
     }
   }
 
-  return buildResponse(program as Program, supabase)
+  return buildResponse(program as Program, supabase, clientDow, clientDate)
 }
 
 async function buildResponse(
   program: Program,
-  supabase: Awaited<ReturnType<typeof import('@/lib/supabase/server')['createClient']>>
+  supabase: Awaited<ReturnType<typeof import('@/lib/supabase/server')['createClient']>>,
+  clientDow: number | null,
+  clientDate: string | null
 ) {
-  const dayOfWeek = new Date().getDay()
-  const todayDate = new Date().toISOString().split('T')[0]
+  const dayOfWeek = clientDow ?? new Date().getDay()
+  const todayDate = clientDate ?? new Date().toISOString().split('T')[0]
   const weekType = program.week_type
   const fridayAlt = program.friday_alt
 
