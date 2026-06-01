@@ -1,15 +1,20 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAppStore } from '@/store/app-store'
 import { useSessionStore } from '@/store/session-store'
+import { useTimerStore } from '@/store/timer-store'
 import { ExerciseCard } from '@/components/today/exercise-card'
+import { RestTimerPill } from '@/components/today/rest-timer-pill'
 import { SessionSummaryModal } from '@/components/today/session-summary-modal'
 import { PartialConfirmModal } from '@/components/today/partial-confirm-modal'
+import { RpePicker } from '@/components/today/rpe-picker'
 import { Textarea } from '@/components/ui/textarea'
 import type { ChangeEntry } from '@/app/api/sessions/log/route'
 import type { ActiveProgram } from '@/store/app-store'
+import { localDateKey } from '@/lib/date'
+import { optimisticMutate } from '@/lib/optimistic'
 
 export default function TodayPage() {
   const router = useRouter()
@@ -23,17 +28,23 @@ export default function TodayPage() {
   const [showPartialConfirm, setShowPartialConfirm] = useState(false)
   const [changes, setChanges] = useState<ChangeEntry[]>([])
   const [error, setError] = useState<string | null>(null)
+  const [rpe, setRpe] = useState<number | null>(null)
+  const [rpeError, setRpeError] = useState<string | null>(null)
+  const [loadedDate, setLoadedDate] = useState<string | null>(null)
+  const rpeReqIdRef = useRef(0)
+  const mountedRef = useRef(true)
 
   const loadProgram = useCallback(async () => {
     setLoading(true)
     try {
       const now = new Date()
       const dow = now.getDay()
-      const date = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+      const date = localDateKey(now)
       const res = await fetch(`/api/programs/active?dow=${dow}&date=${date}`)
       if (res.status === 401) { router.push('/login'); return }
-      const data: ActiveProgram & { todaySession: { id: string; status: string } | null } = await res.json()
+      const data: ActiveProgram = await res.json()
       setActiveProgram(data)
+      setLoadedDate(date)
       // Reset persisted set state if it's bound to a different day or workout
       if (data.todayWorkout) {
         resetIfStale(date, data.todayWorkout.id)
@@ -41,8 +52,10 @@ export default function TodayPage() {
       // Sync sessionLogged flag with server truth
       if (data.todaySession && data.todaySession.status !== 'undone' && data.todaySession.status !== 'skipped') {
         markLogged(data.todaySession.id)
+        setRpe(data.todaySession.rpe ?? null)
       } else {
         clearLogged()
+        setRpe(null)
       }
     } finally {
       setLoading(false)
@@ -53,6 +66,10 @@ export default function TodayPage() {
     loadProgram()
   }, [loadProgram])
 
+  useEffect(() => {
+    return () => { mountedRef.current = false }
+  }, [])
+
   const program = activeProgram?.program
   const todayWorkout = activeProgram?.todayWorkout
   const exercises = activeProgram?.exercises ?? []
@@ -60,6 +77,7 @@ export default function TodayPage() {
   const dow = todayWorkout?.day_of_week
   const isWeekA = program?.week_type === 'A'
   const isVariantDay = (dow === 2 || dow === 5) && isWeekA
+  const willAdvanceFridayAlt = dow === 5 && isWeekA
   const isVolumeDay = todayWorkout?.is_volume === true
 
   // Compute total sets and completed sets across progressable exercises
@@ -88,12 +106,12 @@ export default function TodayPage() {
   }).length
 
   async function doLogSession(isPartial: boolean) {
-    if (!program || !todayWorkout) return
+    if (!program || !todayWorkout || !loadedDate) return
     setLogging(true)
     setError(null)
+    setRpe(null)
     try {
-      const tnow = new Date()
-      const today = `${tnow.getFullYear()}-${String(tnow.getMonth() + 1).padStart(2, '0')}-${String(tnow.getDate()).padStart(2, '0')}`
+      const today = loadedDate
       const setsPayload = exercises.flatMap((ex) => {
         const exState = sets[ex.id] ?? {}
         return Object.entries(exState).map(([setNum, s]) => ({
@@ -141,6 +159,7 @@ export default function TodayPage() {
 
       const data = await res.json()
       markLogged(data.sessionId)
+      useTimerStore.getState().stop()
       setChanges(data.changes)
       setShowSummary(true)
     } finally {
@@ -161,10 +180,9 @@ export default function TodayPage() {
   }
 
   async function handleSkip() {
-    if (!program || !todayWorkout) return
+    if (!program || !todayWorkout || !loadedDate) return
     setSkipping(true)
-    const snow = new Date()
-    const today = `${snow.getFullYear()}-${String(snow.getMonth() + 1).padStart(2, '0')}-${String(snow.getDate()).padStart(2, '0')}`
+    const today = loadedDate
     await fetch('/api/sessions/skip', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -177,6 +195,7 @@ export default function TodayPage() {
       }),
     })
     setSkipping(false)
+    useTimerStore.getState().stop()
     reset()
     loadProgram()
   }
@@ -192,9 +211,31 @@ export default function TodayPage() {
     setUndoing(false)
     if (res.ok) {
       setShowSummary(false)
+      setRpe(null)
+      rpeReqIdRef.current++
       reset()
       loadProgram()
     }
+  }
+
+  async function handleRpeChange(v: number | null) {
+    if (!sessionId) return
+    const myId = ++rpeReqIdRef.current
+    const prev = rpe
+    setRpeError(null)
+    await optimisticMutate({
+      onLocalChange: () => setRpe(v),
+      onLocalRollback: () => setRpe(prev),
+      mutation: () =>
+        fetch(`/api/sessions/${sessionId}/rpe`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ rpe: v }),
+        }),
+      errorMessage: 'Could not save RPE',
+      shouldApply: () => mountedRef.current && rpeReqIdRef.current === myId,
+      onError: (msg) => setRpeError(msg),
+    })
   }
 
   if (loading) {
@@ -269,7 +310,7 @@ export default function TodayPage() {
         </div>
         {isVariantDay && (
           <div style={{ marginTop: 8, padding: '5px 10px', backgroundColor: 'rgba(232,255,71,0.05)', border: '1px solid #333', borderRadius: 4, fontFamily: "'DM Mono', monospace", fontSize: '0.65rem', color: '#888' }}>
-            {dow === 5 ? 'Friday' : 'Tuesday'} {program?.friday_alt} active · next: {program?.friday_alt === 'A1' ? 'A2' : 'A1'}
+            {dow === 5 ? 'Friday' : 'Tuesday'} {program?.friday_alt} active{willAdvanceFridayAlt ? ` · next: ${program?.friday_alt === 'A1' ? 'A2' : 'A1'}` : ''}
           </div>
         )}
         {todayWorkout && (todayWorkout.type === 'lift' || todayWorkout.type === 'combo') && (
@@ -304,8 +345,29 @@ export default function TodayPage() {
               exercise={ex}
               weight={ex.weight_key ? (weights[ex.weight_key] ?? null) : null}
               disabled={sessionLogged}
+              isVolumeDay={isVolumeDay}
             />
           ))
+        )}
+
+        {/* Inline RPE picker (post-log, persists across reloads) */}
+        {sessionLogged && sessionId && !showSummary && (
+          <div
+            style={{
+              marginTop: 12,
+              padding: 12,
+              backgroundColor: '#0f0f0f',
+              border: '1px solid #181818',
+              borderRadius: 4,
+            }}
+          >
+            <RpePicker value={rpe} onChange={handleRpeChange} disabled={undoing} />
+            {rpeError && (
+              <p style={{ fontFamily: "'DM Mono', monospace", color: '#ff6b47', fontSize: '0.7rem', marginTop: 8 }}>
+                {rpeError}
+              </p>
+            )}
+          </div>
         )}
 
         {/* Session notes */}
@@ -427,6 +489,9 @@ export default function TodayPage() {
         )}
       </div>
 
+      {/* Rest timer pill (positions itself fixed) */}
+      <RestTimerPill />
+
       {/* Modals */}
       <SessionSummaryModal
         open={showSummary}
@@ -434,6 +499,9 @@ export default function TodayPage() {
         onUndo={handleUndo}
         onDone={() => setShowSummary(false)}
         undoing={undoing}
+        sessionId={sessionId ?? undefined}
+        rpe={rpe}
+        onRpeChange={handleRpeChange}
       />
       <PartialConfirmModal
         open={showPartialConfirm}

@@ -3,6 +3,8 @@
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import type { ChangeEntry } from '@/app/api/sessions/log/route'
 import { Button } from '@/components/ui/button'
+import { RpePicker } from '@/components/today/rpe-picker'
+import { LIFT_LABELS } from '@/lib/progression'
 
 type Props = {
   open: boolean
@@ -10,6 +12,9 @@ type Props = {
   onUndo: () => void
   onDone: () => void
   undoing: boolean
+  sessionId?: string
+  rpe?: number | null
+  onRpeChange?: (v: number | null) => void
 }
 
 const STATUS_LABELS: Record<string, { label: string; color: string }> = {
@@ -19,18 +24,9 @@ const STATUS_LABELS: Record<string, { label: string; color: string }> = {
   deload: { label: 'deload', color: '#ff8c47' },
 }
 
-const WEIGHT_NAMES: Record<string, string> = {
-  squat: 'Back Squat',
-  bench: 'Bench Press',
-  cgBench: 'Close-Grip Bench',
-  ohp: 'Overhead Press',
-  deadlift: 'Deadlift',
-  satRow: 'Barbell Row',
-  rdl: 'Romanian DL',
-}
-
-export function SessionSummaryModal({ open, changes, onUndo, onDone, undoing }: Props) {
-  const progressableChanges = changes.filter((c) => WEIGHT_NAMES[c.key])
+export function SessionSummaryModal({ open, changes, onUndo, onDone, undoing, sessionId, rpe, onRpeChange }: Props) {
+  const progressableChanges = changes.filter((c) => LIFT_LABELS[c.key])
+  const showRpe = !!sessionId && !!onRpeChange
 
   return (
     <Dialog open={open}>
@@ -55,6 +51,19 @@ export function SessionSummaryModal({ open, changes, onUndo, onDone, undoing }: 
           SESSION LOGGED
         </DialogTitle>
 
+        {showRpe && (
+          <div style={{ marginTop: 12 }}>
+            <RpePicker
+              value={rpe ?? null}
+              onChange={(v) => {
+                if (!onRpeChange) return
+                onRpeChange(v)
+              }}
+              disabled={undoing}
+            />
+          </div>
+        )}
+
         <div style={{ marginTop: 12 }}>
           {progressableChanges.length === 0 ? (
             <p style={{ color: '#666', fontSize: '0.75rem' }}>No weight changes this session.</p>
@@ -77,7 +86,7 @@ export function SessionSummaryModal({ open, changes, onUndo, onDone, undoing }: 
                   >
                     <div>
                       <div style={{ fontSize: '0.75rem', color: '#d0d0d0' }}>
-                        {WEIGHT_NAMES[c.key] ?? c.key}
+                        {LIFT_LABELS[c.key] ?? c.key}
                       </div>
                       <div style={{ fontSize: '0.65rem', color: '#666', marginTop: 2 }}>
                         {c.from} → {c.to} lbs

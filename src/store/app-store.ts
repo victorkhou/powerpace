@@ -9,7 +9,7 @@ export type ActiveProgram = {
   todayWorkout: WorkoutDay | null
   exercises: Exercise[]
   weights: Record<string, WorkingWeight>
-  todaySession: { id: string; status: string } | null
+  todaySession: { id: string; status: string; rpe: number | null } | null
 }
 
 export type { Program }
