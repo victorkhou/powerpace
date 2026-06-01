@@ -170,6 +170,7 @@ export type Database = {
           volume_lbs: number | null
           weight_snapshot: Json | null
           logged_at: string
+          rpe: number | null
         }
         Insert: {
           id?: string
@@ -184,12 +185,14 @@ export type Database = {
           volume_lbs?: number | null
           weight_snapshot?: Json | null
           logged_at?: string
+          rpe?: number | null
         }
         Update: {
           status?: 'completed' | 'partial' | 'skipped' | 'undone'
           notes?: string | null
           volume_lbs?: number | null
           weight_snapshot?: Json | null
+          rpe?: number | null
         }
       }
       session_sets: {
