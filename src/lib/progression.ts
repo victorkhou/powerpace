@@ -1,3 +1,5 @@
+import type { Exercise } from '@/types/database'
+
 export const INCREMENTS: Record<string, number> = {
   squat: 5,
   rdl: 2.5,
@@ -96,4 +98,44 @@ export function processLift(params: {
   }
 
   return { status: 'hold', weight, failures: newFailures, streak: 0, pr }
+}
+
+const HEAVY_COMPOUNDS = new Set(['squat', 'bench', 'incline', 'ohp', 'deadlift', 'row'])
+const ACCESSORY_LIFTS = new Set(['cgbp', 'rdl', 'goodMornings'])
+
+/**
+ * Returns rest seconds for an exercise, or null when no rest is appropriate
+ * (runs). Volume work uses 120s, heavy compounds use 180s on intensity days
+ * and 120s on volume days, accessories use 90s, bodyweight uses 60s.
+ */
+export function getRestSeconds(exercise: Exercise, isVolumeDay: boolean): number | null {
+  if (exercise.is_run || exercise.progression_type === 'run') return null
+  if (exercise.progression_type === 'bodyweight') return 60
+
+  const key = exercise.weight_key
+  if (key && AUTO_KEYS.has(key)) return 120
+
+  if (key && PROGRESSABLE.has(key)) {
+    if (HEAVY_COMPOUNDS.has(key)) return isVolumeDay ? 120 : 180
+    if (ACCESSORY_LIFTS.has(key)) return 90
+  }
+
+  return 90
+}
+
+export const LIFT_LABELS: Record<string, string> = {
+  squat: 'Back Squat',
+  bench: 'Bench Press',
+  incline: 'Incline Bench',
+  cgbp: 'Close-Grip Bench',
+  ohp: 'Overhead Press',
+  deadlift: 'Deadlift',
+  row: 'Barbell Row',
+  rdl: 'Romanian DL',
+  goodMornings: 'Good Mornings',
+  squatVol: 'Squat — Volume',
+  benchVol: 'Bench — Volume',
+  inclineVol: 'Incline — Volume',
+  ohpVol: 'OHP — Volume',
+  rowVol: 'Row — Volume',
 }
