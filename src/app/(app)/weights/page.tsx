@@ -2,25 +2,10 @@
 
 import { useEffect, useState } from 'react'
 import { useAppStore } from '@/store/app-store'
-import { INCREMENTS } from '@/lib/progression'
+import { INCREMENTS, LIFT_LABELS } from '@/lib/progression'
 import type { WorkingWeight } from '@/types/database'
-
-const KEY_LABELS: Record<string, string> = {
-  squat: 'Back Squat',
-  bench: 'Flat Bench',
-  incline: 'Incline Bench',
-  ohp: 'Overhead Press',
-  deadlift: 'Deadlift',
-  row: 'Barbell Row',
-  cgbp: 'Close-Grip Bench',
-  rdl: 'Romanian DL',
-  goodMornings: 'Good Mornings',
-  squatVol: 'Squat — Volume',
-  benchVol: 'Bench — Volume',
-  inclineVol: 'Incline — Volume',
-  ohpVol: 'OHP — Volume',
-  rowVol: 'Row — Volume',
-}
+import { PlateCalculatorSheet } from '@/components/today/plate-calculator-sheet'
+import { activeProgramQuery } from '@/lib/date'
 
 const LINEAR_ORDER = ['squat', 'bench', 'incline', 'ohp', 'deadlift', 'row', 'cgbp', 'rdl', 'goodMornings']
 const AUTO_ORDER = ['squatVol', 'benchVol', 'inclineVol', 'ohpVol', 'rowVol']
@@ -31,6 +16,7 @@ export default function WeightsPage() {
   const [editValues, setEditValues] = useState<Record<string, number>>({})
   const [saving, setSaving] = useState<string | null>(null)
   const [loading, setLoading] = useState(!activeProgram)
+  const [plateOpenKey, setPlateOpenKey] = useState<string | null>(null)
 
   const program = activeProgram?.program
   const weights = activeProgram?.weights ?? {}
@@ -38,7 +24,7 @@ export default function WeightsPage() {
   useEffect(() => {
     if (activeProgram) { setLoading(false); return }
     async function load() {
-      const res = await fetch('/api/programs/active')
+      const res = await fetch(`/api/programs/active${activeProgramQuery()}`)
       if (res.ok) {
         const data = await res.json()
         setActiveProgram(data)
@@ -71,7 +57,7 @@ export default function WeightsPage() {
         alert(`Save failed: ${err.error ?? res.statusText}`)
         return
       }
-      const refresh = await fetch('/api/programs/active')
+      const refresh = await fetch(`/api/programs/active${activeProgramQuery()}`)
       if (refresh.ok) setActiveProgram(await refresh.json())
     } catch (e) {
       alert(`Save failed: ${e instanceof Error ? e.message : 'network error'}`)
@@ -115,7 +101,7 @@ export default function WeightsPage() {
           <div style={{ flex: 1 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <span style={{ fontFamily: "'DM Mono', monospace", fontSize: '0.8rem', color: '#d0d0d0' }}>
-                {KEY_LABELS[key] ?? key}
+                {LIFT_LABELS[key] ?? key}
               </span>
               {type === 'auto' && (
                 <span style={{ fontFamily: "'DM Mono', monospace", fontSize: '0.55rem', color: '#47c8ff', border: '1px solid #47c8ff', borderRadius: 3, padding: '1px 4px' }}>auto @ 87.5%</span>
@@ -192,9 +178,27 @@ export default function WeightsPage() {
                 {saving === key && <span style={{ fontFamily: "'DM Mono', monospace", fontSize: '0.6rem', color: '#666' }}>...</span>}
               </div>
             ) : (
-              <span style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: '1.8rem', color: '#d0d0d0', lineHeight: 1 }}>
+              <button
+                type="button"
+                onClick={() => setPlateOpenKey(key)}
+                aria-label={`Calculate plates for ${LIFT_LABELS[key] ?? key}`}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  padding: 0,
+                  margin: 0,
+                  fontFamily: "'Bebas Neue', sans-serif",
+                  fontSize: '1.8rem',
+                  color: '#d0d0d0',
+                  lineHeight: 1,
+                  cursor: 'pointer',
+                  textDecoration: 'underline dotted',
+                  textUnderlineOffset: 4,
+                  textDecorationColor: '#555',
+                }}
+              >
                 {ww.weight_lbs}
-              </span>
+              </button>
             )}
           </div>
         </div>
@@ -245,6 +249,15 @@ export default function WeightsPage() {
         </div>
         {AUTO_ORDER.map((key) => renderWeightRow(key, weights[key], 'auto'))}
       </div>
+
+      {plateOpenKey && weights[plateOpenKey] && (
+        <PlateCalculatorSheet
+          weightLbs={weights[plateOpenKey].weight_lbs}
+          open={plateOpenKey !== null}
+          onClose={() => setPlateOpenKey(null)}
+          label={LIFT_LABELS[plateOpenKey] ?? plateOpenKey}
+        />
+      )}
     </div>
   )
 }

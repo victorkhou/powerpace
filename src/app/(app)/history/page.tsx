@@ -1,6 +1,8 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { RPE_COLOR } from '@/lib/rpe'
+import { LIFT_LABELS } from '@/lib/progression'
 type SessionRow = {
   id: string
   date: string
@@ -8,6 +10,7 @@ type SessionRow = {
   status: string
   notes: string | null
   volume_lbs: number | null
+  rpe: number | null
   workout_day: { name: string; type: string; tag: string | null } | null
 }
 
@@ -16,11 +19,6 @@ type PREntry = {
   pr_lbs: number
   streak: number
   failures: number
-}
-
-const KEY_LABELS: Record<string, string> = {
-  squat: 'Squat', bench: 'Bench', ohp: 'OHP', deadlift: 'Deadlift',
-  cgBench: 'CG Bench', satRow: 'Row', rdl: 'RDL',
 }
 
 const STATUS_COLOR: Record<string, string> = {
@@ -124,6 +122,11 @@ export default function HistoryPage() {
                       <span style={{ fontFamily: "'DM Mono', monospace", fontSize: '0.55rem', color: STATUS_COLOR[s.status] ?? '#555', border: `1px solid ${STATUS_COLOR[s.status] ?? '#333'}`, borderRadius: 3, padding: '1px 4px' }}>
                         {s.status}
                       </span>
+                      {s.rpe != null && (
+                        <span style={{ fontFamily: "'DM Mono', monospace", fontSize: '0.55rem', color: RPE_COLOR(s.rpe), border: `1px solid ${RPE_COLOR(s.rpe)}`, borderRadius: 3, padding: '1px 4px' }}>
+                          RPE {s.rpe}
+                        </span>
+                      )}
                     </div>
                     <div style={{ fontFamily: "'DM Mono', monospace", fontSize: '0.65rem', color: '#555', marginTop: 3 }}>
                       {s.date} · week {s.week}
@@ -173,7 +176,7 @@ export default function HistoryPage() {
               >
                 <div>
                   <span style={{ fontFamily: "'DM Mono', monospace", fontSize: '0.8rem', color: '#d0d0d0' }}>
-                    {KEY_LABELS[pr.key] ?? pr.key}
+                    {LIFT_LABELS[pr.key] ?? pr.key}
                   </span>
                   <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
                     {pr.streak > 0 && (

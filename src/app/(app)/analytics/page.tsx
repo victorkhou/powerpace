@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts'
+import { LIFT_LABELS } from '@/lib/progression'
 
 type VolumePoint = { date: string; week: number; volume: number }
 type ProgressionPoint = { key: string; weight: number; reason: string; date: string }
@@ -11,14 +12,9 @@ const LIFT_COLORS: Record<string, string> = {
   bench: '#47c8ff',
   deadlift: '#ff6b47',
   ohp: '#c47fff',
-  cgBench: '#4aff91',
-  satRow: '#f0a500',
+  cgbp: '#4aff91',
+  row: '#f0a500',
   rdl: '#ff8c47',
-}
-
-const KEY_LABELS: Record<string, string> = {
-  squat: 'Squat', bench: 'Bench', ohp: 'OHP', deadlift: 'Deadlift',
-  cgBench: 'CG Bench', satRow: 'Row', rdl: 'RDL',
 }
 
 export default function AnalyticsPage() {
@@ -161,14 +157,14 @@ export default function AnalyticsPage() {
                     minHeight: 36,
                   }}
                 >
-                  {KEY_LABELS[key] ?? key}
+                  {LIFT_LABELS[key] ?? key}
                 </button>
               ))}
             </div>
 
             {liftData.length === 0 ? (
               <p style={{ fontFamily: "'DM Mono', monospace", color: '#444', fontSize: '0.8rem', textAlign: 'center', paddingTop: 40 }}>
-                No progression data for {KEY_LABELS[selectedLift] ?? selectedLift} yet.
+                No progression data for {LIFT_LABELS[selectedLift] ?? selectedLift} yet.
               </p>
             ) : (
               <div style={{ width: '100%', height: 260 }}>
