@@ -9,12 +9,12 @@ export async function POST(request: NextRequest) {
 
   const { data: program } = await supabase
     .from('programs')
-    .select('id')
+    .select('id, user_id')
     .eq('id', programId)
-    .eq('user_id', user.id)
-    .single()
+    .single<{ id: string; user_id: string }>()
 
   if (!program) return NextResponse.json({ error: 'Program not found' }, { status: 404 })
+  if (program.user_id !== user.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
 
   const { data: session, error } = await db
     .from('sessions')
@@ -25,6 +25,10 @@ export async function POST(request: NextRequest) {
       week_number: weekNumber,
       week_type: weekType,
       status: 'skipped',
+      rpe: null,
+      notes: null,
+      volume_lbs: 0,
+      weight_snapshot: {},
     }, { onConflict: 'program_id,date' })
     .select()
     .single()

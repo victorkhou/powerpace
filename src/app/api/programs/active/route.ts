@@ -92,7 +92,7 @@ async function buildResponse(
 
   const { data: todaySession } = await supabase
     .from('sessions')
-    .select('id, status')
+    .select('id, status, rpe')
     .eq('program_id', program.id)
     .eq('date', todayDate)
     .maybeSingle()

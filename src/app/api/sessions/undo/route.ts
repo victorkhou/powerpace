@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/api-auth'
+import { isFriday } from '@/lib/date'
 
 export async function POST(request: NextRequest) {
   const { user, supabase, db, error: authError } = await getAuthenticatedUser()
@@ -50,15 +51,13 @@ export async function POST(request: NextRequest) {
   await db.from('run_logs').delete().eq('session_id', sessionId)
   await db.from('weight_history').delete().eq('session_id', sessionId)
 
-  // Mark session as undone
-  await db.from('sessions').update({ status: 'undone' }).eq('id', sessionId)
+  // Mark session as undone (also clear rpe)
+  await db.from('sessions').update({ status: 'undone', rpe: null }).eq('id', sessionId)
 
   // If this was a Friday Week A log, the log handler advanced friday_alt.
   // Reverse it to restore the alternation. Tuesday Week A doesn't advance,
   // so it doesn't need a reversal.
-  const sessionDate = new Date(session.date as string)
-  const dow = sessionDate.getUTCDay()
-  if (session.week_type === 'A' && dow === 5) {
+  if (session.week_type === 'A' && isFriday(session.date as string)) {
     const { data: progRow } = await supabase
       .from('programs')
       .select('friday_alt')

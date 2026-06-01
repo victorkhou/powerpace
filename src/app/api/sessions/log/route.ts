@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/api-auth'
 import { processLift, recompute, PROGRESSABLE, AUTO_KEYS } from '@/lib/progression'
+import { isFriday } from '@/lib/date'
 import type { Program, WorkingWeight } from '@/types/database'
 
 export type LogSessionRequest = {
@@ -51,11 +52,11 @@ export async function POST(request: NextRequest) {
     .from('programs')
     .select('*')
     .eq('id', programId)
-    .eq('user_id', user.id)
     .single()
 
   const program = programRaw as Program | null
   if (!program) return NextResponse.json({ error: 'Program not found' }, { status: 404 })
+  if (program.user_id !== user.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
 
   const { data: weightsArrRaw } = await supabase
     .from('working_weights')
@@ -82,7 +83,7 @@ export async function POST(request: NextRequest) {
 
   const { data: session, error: sessionError } = await db
     .from('sessions')
-    .insert({
+    .upsert({
       program_id: programId,
       workout_day_id: workoutDayId,
       date,
@@ -93,7 +94,9 @@ export async function POST(request: NextRequest) {
       notes: notes || null,
       volume_lbs: volume,
       weight_snapshot: weightSnapshot,
-    })
+      rpe: null,
+      logged_at: new Date().toISOString(),
+    }, { onConflict: 'program_id,date' })
     .select()
     .single()
 
@@ -218,8 +221,7 @@ export async function POST(request: NextRequest) {
   }
 
   // Friday alternation advance: if this is Friday + Week A, flip friday_alt
-  const dayOfWeek = new Date(date).getDay()
-  if (dayOfWeek === 5 && weekType === 'A') {
+  if (isFriday(date) && weekType === 'A') {
     const newAlt = program.friday_alt === 'A1' ? 'A2' : 'A1'
     await db.from('programs').update({ friday_alt: newAlt }).eq('id', programId)
   }
