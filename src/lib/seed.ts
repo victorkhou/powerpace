@@ -1,4 +1,4 @@
-type ExerciseSeed = {
+export type ExerciseSeed = {
   name: string
   sets: number
   reps: number
@@ -11,7 +11,7 @@ type ExerciseSeed = {
   sort_order: number
 }
 
-type DaySeed = {
+export type DaySeed = {
   day_of_week: number
   week_type: 'A' | 'B' | 'both'
   variant: string | null
@@ -22,7 +22,7 @@ type DaySeed = {
   exercises: ExerciseSeed[]
 }
 
-const DAYS: DaySeed[] = [
+export const SEED_DAYS: DaySeed[] = [
   // Monday — Legs Volume (both weeks)
   {
     day_of_week: 1, week_type: 'both', variant: null, is_volume: true,
@@ -182,7 +182,7 @@ export async function seedProgram(supabase: any, userId: string): Promise<string
   if (pErr || !program) throw new Error(`Failed to create program: ${pErr?.message}`)
   const programId = program.id
 
-  for (const day of DAYS) {
+  for (const day of SEED_DAYS) {
     const { data: dayRow, error: dErr } = await supabase
       .from('workout_days')
       .insert({
