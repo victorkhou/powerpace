@@ -6,6 +6,7 @@ import { useSessionStore } from '@/store/session-store'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { activeProgramQuery } from '@/lib/date'
+import { TemplatesSection } from '@/components/settings/templates-section'
 
 export default function SettingsPage() {
   const { activeProgram, setActiveProgram, clearProgram } = useAppStore()
@@ -158,6 +159,9 @@ export default function SettingsPage() {
             </span>
           </div>
         </div>
+
+        {/* Workout templates editor */}
+        <TemplatesSection />
 
         {/* Sign out */}
         <div style={{ marginTop: 40 }}>
