@@ -3,8 +3,14 @@ import { cookies } from 'next/headers'
 import { NextResponse, type NextRequest } from 'next/server'
 
 export async function GET(request: NextRequest) {
-  const { searchParams, origin } = new URL(request.url)
+  const { searchParams } = new URL(request.url)
   const code = searchParams.get('code')
+
+  const forwardedHost = request.headers.get('x-forwarded-host')
+  const forwardedProto = request.headers.get('x-forwarded-proto')
+  const host = forwardedHost ?? request.headers.get('host') ?? new URL(request.url).host
+  const proto = forwardedProto ?? (host.startsWith('localhost') ? 'http' : 'https')
+  const origin = `${proto}://${host}`
 
   if (code) {
     const cookieStore = await cookies()
