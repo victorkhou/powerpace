@@ -35,14 +35,11 @@ const AUTO_STEP: Record<string, number> = {
 }
 
 export function recompute(w: Record<string, number>): Record<string, number> {
-  return {
-    ...w,
-    squatVol: Math.round((w.squat * 0.875) / 5) * 5,
-    benchVol: Math.round((w.bench * 0.875) / 2.5) * 2.5,
-    inclineVol: Math.round((w.incline * 0.875) / 2.5) * 2.5,
-    ohpVol: Math.round((w.ohp * 0.875) / 2.5) * 2.5,
-    rowVol: Math.round((w.row * 0.875) / 5) * 5,
+  const out = { ...w }
+  for (const [volKey, parentKey] of Object.entries(AUTO_PARENT)) {
+    if (w[parentKey] != null) out[volKey] = autoVolumeFor(parentKey, w[parentKey])
   }
+  return out
 }
 
 export function autoVolumeFor(parentKey: string, parentWeight: number): number {
