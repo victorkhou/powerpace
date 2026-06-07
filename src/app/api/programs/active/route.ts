@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/api-auth'
 import { seedProgram } from '@/lib/seed'
+import { resolveWorkoutForDate } from '@/lib/resolve-workout'
 import type { Program, WorkoutDay, Exercise, WorkingWeight } from '@/types/database'
 
 export async function GET(request: NextRequest) {
@@ -48,28 +49,25 @@ async function buildResponse(
 ) {
   const dayOfWeek = clientDow ?? new Date().getDay()
   const todayDate = clientDate ?? new Date().toISOString().split('T')[0]
-  const weekType = program.week_type
-  const fridayAlt = program.friday_alt
 
-  // Match day_of_week + (week_type='both' or current). For Tue/Fri Week A
-  // with variants, pick the one matching friday_alt.
-  const { data: candidateDays } = await supabase
+  // Load all workout days for the program so an override (which points at any
+  // day_of_week) can resolve, then apply a per-date override if one exists.
+  const { data: allDays } = await supabase
     .from('workout_days')
     .select('*')
     .eq('program_id', program.id)
-    .eq('day_of_week', dayOfWeek)
 
-  const days = (candidateDays ?? []) as WorkoutDay[]
+  const days = (allDays ?? []) as WorkoutDay[]
 
-  let todayWorkout: WorkoutDay | null = null
-  for (const d of days) {
-    if (d.week_type !== 'both' && d.week_type !== weekType) continue
-    if (d.variant !== null) {
-      if (d.variant === fridayAlt) { todayWorkout = d; break }
-    } else {
-      todayWorkout = d
-    }
-  }
+  const { data: override } = await supabase
+    .from('schedule_overrides')
+    .select('workout_day_id')
+    .eq('program_id', program.id)
+    .eq('date', todayDate)
+    .maybeSingle()
+
+  const overrideId = (override as { workout_day_id: string } | null)?.workout_day_id ?? null
+  const todayWorkout = resolveWorkoutForDate(days, dayOfWeek, program, overrideId)
 
   let exercises: Exercise[] = []
   if (todayWorkout?.id) {

@@ -275,6 +275,25 @@ export type Database = {
         }
         Update: never
       }
+      schedule_overrides: {
+        Row: {
+          id: string
+          program_id: string
+          date: string
+          workout_day_id: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          program_id: string
+          date: string
+          workout_day_id: string
+          created_at?: string
+        }
+        Update: {
+          workout_day_id?: string
+        }
+      }
     }
   }
 }
@@ -289,3 +308,4 @@ export type Session = Database['public']['Tables']['sessions']['Row']
 export type SessionSet = Database['public']['Tables']['session_sets']['Row']
 export type RunLog = Database['public']['Tables']['run_logs']['Row']
 export type WeightHistory = Database['public']['Tables']['weight_history']['Row']
+export type ScheduleOverride = Database['public']['Tables']['schedule_overrides']['Row']
