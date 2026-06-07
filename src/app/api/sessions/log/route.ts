@@ -41,12 +41,50 @@ export type ChangeEntry = {
   failures?: number
 }
 
-export async function POST(request: NextRequest) {
-  const { user, supabase, db, error: authError } = await getAuthenticatedUser()
-  if (authError || !user || !supabase) return authError!
+// Runtime validation: request.json() is `any`, so the LogSessionRequest
+// annotation is compile-time only. Validate the untrusted body before any of
+// it reaches the volume sum, the progression engine, or the DB.
+function validateLogBody(raw: unknown): { body: LogSessionRequest } | { error: string } {
+  if (typeof raw !== 'object' || raw === null) return { error: 'invalid body' }
+  const b = raw as Record<string, unknown>
+  if (typeof b.programId !== 'string' || !b.programId) return { error: 'programId required' }
+  if (typeof b.workoutDayId !== 'string' || !b.workoutDayId) return { error: 'workoutDayId required' }
+  if (typeof b.date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(b.date)) return { error: 'invalid date' }
+  if (b.weekType !== 'A' && b.weekType !== 'B') return { error: 'invalid weekType' }
+  if (!Number.isInteger(b.weekNumber) || (b.weekNumber as number) < 1) return { error: 'invalid weekNumber' }
+  if (b.fridayAlt !== null && b.fridayAlt !== 'A1' && b.fridayAlt !== 'A2') return { error: 'invalid fridayAlt' }
+  if (typeof b.isPartial !== 'boolean') return { error: 'isPartial must be a boolean' }
+  if (typeof b.notes !== 'string') return { error: 'notes must be a string' }
+  if (!Array.isArray(b.sets)) return { error: 'sets must be an array' }
+  for (const s of b.sets as unknown[]) {
+    if (typeof s !== 'object' || s === null) return { error: 'invalid set' }
+    const set = s as Record<string, unknown>
+    if (typeof set.exerciseId !== 'string') return { error: 'set.exerciseId required' }
+    if (set.weightKey !== null && typeof set.weightKey !== 'string') return { error: 'invalid set.weightKey' }
+    if (!Number.isInteger(set.setNumber)) return { error: 'invalid set.setNumber' }
+    if (typeof set.completed !== 'boolean') return { error: 'invalid set.completed' }
+    if (set.weightLbs !== null && (typeof set.weightLbs !== 'number' || !Number.isFinite(set.weightLbs) || set.weightLbs < 0)) {
+      return { error: 'invalid set.weightLbs' }
+    }
+    if (!Number.isInteger(set.repsTarget) || (set.repsTarget as number) < 0) return { error: 'invalid set.repsTarget' }
+  }
+  if (!Array.isArray(b.runLogs)) return { error: 'runLogs must be an array' }
+  for (const r of b.runLogs as unknown[]) {
+    if (typeof r !== 'object' || r === null) return { error: 'invalid runLog' }
+    const run = r as Record<string, unknown>
+    if (typeof run.exerciseId !== 'string') return { error: 'runLog.exerciseId required' }
+  }
+  return { body: raw as LogSessionRequest }
+}
 
-  const body: LogSessionRequest = await request.json()
-  const { programId, workoutDayId, date, weekNumber, weekType, fridayAlt, sets, runLogs, notes, isPartial } = body
+export async function POST(request: NextRequest) {
+  const auth = await getAuthenticatedUser()
+  if (auth.error) return auth.error
+  const { user, supabase, db } = auth
+
+  const parsed = validateLogBody(await request.json())
+  if ('error' in parsed) return NextResponse.json({ error: parsed.error }, { status: 400 })
+  const { programId, workoutDayId, date, weekNumber, weekType, fridayAlt, sets, runLogs, notes, isPartial } = parsed.body
 
   const { data: programRaw } = await supabase
     .from('programs')
@@ -81,61 +119,11 @@ export async function POST(request: NextRequest) {
     .filter((s) => s.completed && s.weightLbs != null && s.weightKey != null && !AUTO_KEYS.has(s.weightKey))
     .reduce((acc, s) => acc + (s.weightLbs! * s.repsTarget), 0)
 
-  const { data: session, error: sessionError } = await db
-    .from('sessions')
-    .upsert({
-      program_id: programId,
-      workout_day_id: workoutDayId,
-      date,
-      week_number: weekNumber,
-      week_type: weekType,
-      friday_alt: fridayAlt,
-      status: isPartial ? 'partial' : 'completed',
-      notes: notes || null,
-      volume_lbs: volume,
-      weight_snapshot: weightSnapshot,
-      rpe: null,
-      logged_at: new Date().toISOString(),
-    }, { onConflict: 'program_id,date' })
-    .select()
-    .single()
-
-  if (sessionError || !session) {
-    return NextResponse.json({ error: sessionError?.message ?? 'Failed to create session' }, { status: 500 })
-  }
-
-  if (sets.length > 0) {
-    const { error: setsError } = await db.from('session_sets').insert(
-      sets.map((s: (typeof sets)[number]) => ({
-        session_id: session.id,
-        exercise_id: s.exerciseId,
-        set_number: s.setNumber,
-        completed: s.completed,
-        weight_lbs: s.weightLbs,
-        reps_target: s.repsTarget,
-        reps_actual: s.repsActual,
-      }))
-    )
-    if (setsError) {
-      await db.from('sessions').delete().eq('id', session.id)
-      return NextResponse.json({ error: setsError.message }, { status: 500 })
-    }
-  }
-
-  if (runLogs.length > 0) {
-    await db.from('run_logs').insert(
-      runLogs.map((r: (typeof runLogs)[number]) => ({
-        session_id: session.id,
-        exercise_id: r.exerciseId,
-        pace_actual: r.paceActual,
-        pace_target: r.paceTarget,
-      }))
-    )
-  }
-
-  // Run progression engine
+  // ── Pure computation (tested engine) — no writes happen until the RPC ──
   const changes: ChangeEntry[] = []
   const updatedWeights: Record<string, number> = { ...weightSnapshot }
+  const weightUpdates: Array<{ key: string; weight_lbs: number; failures: number; streak: number; pr_lbs: number }> = []
+  const weightHistory: Array<{ weight_key: string; weight_before: number; weight_after: number; change_reason: string; failures_at_change: number }> = []
 
   for (const [, exSets] of Object.entries(setsByExercise)) {
     const firstSet = exSets[0]
@@ -156,26 +144,20 @@ export async function POST(request: NextRequest) {
     })
 
     if (result.status !== 'hold' || result.failures !== ww.failures) {
-      await db
-        .from('working_weights')
-        .update({
-          weight_lbs: result.weight,
-          failures: result.failures,
-          streak: result.streak,
-          pr_lbs: result.pr,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('program_id', programId)
-        .eq('key', firstSet.weightKey)
+      weightUpdates.push({
+        key: firstSet.weightKey,
+        weight_lbs: result.weight,
+        failures: result.failures,
+        streak: result.streak,
+        pr_lbs: result.pr,
+      })
 
       let changeReason: string
       if (result.status === 'up') changeReason = 'progression'
       else if (result.status === 'down') changeReason = 'failure_reset'
       else changeReason = 'failure_hold'
 
-      await db.from('weight_history').insert({
-        program_id: programId,
-        session_id: session.id,
+      weightHistory.push({
         weight_key: firstSet.weightKey,
         weight_before: ww.weight_lbs,
         weight_after: result.weight,
@@ -206,25 +188,65 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  // Recompute all auto-derived volume weights (87.5% of intensity)
+  // Recompute auto-derived volume weights (only push genuine changes).
   const recomputed = recompute(updatedWeights)
   for (const key of AUTO_KEYS) {
     const newVal = recomputed[key]
     const ww = weightsMap[key]
     if (ww && newVal !== undefined && newVal !== ww.weight_lbs) {
-      await db
-        .from('working_weights')
-        .update({ weight_lbs: newVal, updated_at: new Date().toISOString() })
-        .eq('program_id', programId)
-        .eq('key', key)
+      weightUpdates.push({
+        key,
+        weight_lbs: newVal,
+        failures: ww.failures,
+        streak: ww.streak,
+        pr_lbs: ww.pr_lbs ?? ww.weight_lbs,
+      })
     }
   }
 
-  // Friday alternation advance: if this is Friday + Week A, flip friday_alt
-  if (isFriday(date) && weekType === 'A') {
-    const newAlt = program.friday_alt === 'A1' ? 'A2' : 'A1'
-    await db.from('programs').update({ friday_alt: newAlt }).eq('id', programId)
+  const newFridayAlt =
+    isFriday(date) && weekType === 'A' ? (program.friday_alt === 'A1' ? 'A2' : 'A1') : null
+
+  // ── Single atomic write: session + sets + run logs + weight updates +
+  // history + friday_alt flip all commit together, or none do. ──
+  const { data: rpcResult, error: rpcError } = await db.rpc('log_session', {
+    payload: {
+      session: {
+        program_id: programId,
+        workout_day_id: workoutDayId,
+        date,
+        week_number: weekNumber,
+        week_type: weekType,
+        friday_alt: fridayAlt,
+        status: isPartial ? 'partial' : 'completed',
+        notes: notes || null,
+        volume_lbs: volume,
+        weight_snapshot: weightSnapshot,
+        logged_at: new Date().toISOString(),
+      },
+      sets: sets.map((s) => ({
+        exercise_id: s.exerciseId,
+        set_number: s.setNumber,
+        completed: s.completed,
+        weight_lbs: s.weightLbs,
+        reps_target: s.repsTarget,
+        reps_actual: s.repsActual,
+      })),
+      runLogs: runLogs.map((r) => ({
+        exercise_id: r.exerciseId,
+        pace_actual: r.paceActual,
+        pace_target: r.paceTarget,
+      })),
+      weightUpdates,
+      weightHistory,
+      newFridayAlt,
+    },
+  })
+
+  if (rpcError) {
+    return NextResponse.json({ error: rpcError.message }, { status: 500 })
   }
 
-  return NextResponse.json({ sessionId: session.id, changes })
+  const sessionId = (rpcResult as { sessionId: string } | null)?.sessionId
+  return NextResponse.json({ sessionId, changes })
 }
