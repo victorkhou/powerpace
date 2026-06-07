@@ -13,6 +13,7 @@ export default function SettingsPage() {
   const resetSession = useSessionStore((s) => s.reset)
   const router = useRouter()
   const [weekInput, setWeekInput] = useState('')
+  const [deloadInput, setDeloadInput] = useState('')
   const [saving, setSaving] = useState(false)
   const [loading, setLoading] = useState(!activeProgram)
 
@@ -31,6 +32,7 @@ export default function SettingsPage() {
   useEffect(() => {
     if (program) {
       setWeekInput(String(program.week_number))
+      setDeloadInput(program.deload_week != null ? String(program.deload_week) : '')
     }
   }, [program])
 
@@ -43,6 +45,22 @@ export default function SettingsPage() {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ programId: program.id, weekNumber: val }),
+    })
+    const res = await fetch(`/api/programs/active${activeProgramQuery()}`)
+    if (res.ok) setActiveProgram(await res.json())
+    setSaving(false)
+  }
+
+  async function saveDeloadWeek() {
+    if (!program) return
+    const trimmed = deloadInput.trim()
+    const deloadWeek = trimmed === '' ? null : parseInt(trimmed)
+    if (deloadWeek !== null && (isNaN(deloadWeek) || deloadWeek < 1)) return
+    setSaving(true)
+    await fetch('/api/programs/settings', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ programId: program.id, deloadWeek }),
     })
     const res = await fetch(`/api/programs/active${activeProgramQuery()}`)
     if (res.ok) setActiveProgram(await res.json())
@@ -144,6 +162,31 @@ export default function SettingsPage() {
             >
               {saving ? '...' : 'save'}
             </button>
+          </div>
+
+          {/* Deload week */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 12 }}>
+            <label style={{ fontFamily: "'DM Mono', monospace", fontSize: '0.7rem', color: '#888', flexShrink: 0 }}>
+              deload wk:
+            </label>
+            <input
+              type="number"
+              value={deloadInput}
+              onChange={(e) => setDeloadInput(e.target.value)}
+              min={1}
+              placeholder="none"
+              style={{ width: 56, height: 36, textAlign: 'center', backgroundColor: '#181818', border: '1px solid #333', borderRadius: 4, color: '#d0d0d0', fontFamily: "'DM Mono', monospace", fontSize: '0.85rem' }}
+            />
+            <button
+              onClick={saveDeloadWeek}
+              disabled={saving}
+              style={{ padding: '6px 12px', borderRadius: 4, border: '1px solid #333', backgroundColor: '#181818', color: '#d0d0d0', fontFamily: "'DM Mono', monospace", fontSize: '0.7rem', cursor: 'pointer', minHeight: 36 }}
+            >
+              {saving ? '...' : 'save'}
+            </button>
+            <span style={{ fontFamily: "'DM Mono', monospace", fontSize: '0.6rem', color: '#555' }}>
+              (blank = none)
+            </span>
           </div>
 
           {/* Friday alternation */}
