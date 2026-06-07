@@ -16,12 +16,17 @@ export async function GET(request: NextRequest) {
   const clientDow = dowParam !== null ? parseInt(dowParam, 10) : null
   const clientDate = dateParam ?? null
 
+  // At most one active program per user is guaranteed by a partial unique index
+  // (migration 009); maybeSingle tolerates the zero-row case (first-time user)
+  // without throwing, so we can fall through to seeding.
   const { data: program, error: programError } = await supabase
     .from('programs')
     .select('*')
     .eq('user_id', user.id)
     .eq('is_active', true)
-    .single()
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
 
   if (programError || !program) {
     try {
