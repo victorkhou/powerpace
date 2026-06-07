@@ -1,20 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/api-auth'
+import { requireProgram } from '@/lib/ownership'
 
 export async function POST(request: NextRequest) {
-  const { user, supabase, db, error: authError } = await getAuthenticatedUser()
-  if (authError || !user || !supabase) return authError!
+  const auth = await getAuthenticatedUser()
+  if (auth.error) return auth.error
+  const { user, supabase, db } = auth
 
   const { programId, workoutDayId, date, weekNumber, weekType } = await request.json()
 
-  const { data: program } = await supabase
-    .from('programs')
-    .select('id, user_id')
-    .eq('id', programId)
-    .single<{ id: string; user_id: string }>()
-
-  if (!program) return NextResponse.json({ error: 'Program not found' }, { status: 404 })
-  if (program.user_id !== user.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+  const owned = await requireProgram(supabase, user, programId)
+  if ('error' in owned) return owned.error
 
   const { data: session, error } = await db
     .from('sessions')

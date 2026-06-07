@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/api-auth'
 import { processLift, recompute, PROGRESSABLE, AUTO_KEYS } from '@/lib/progression'
 import { isFriday } from '@/lib/date'
-import type { Program, WorkingWeight } from '@/types/database'
+import { requireProgram } from '@/lib/ownership'
+import type { WorkingWeight } from '@/types/database'
 
 export type LogSessionRequest = {
   programId: string
@@ -86,15 +87,9 @@ export async function POST(request: NextRequest) {
   if ('error' in parsed) return NextResponse.json({ error: parsed.error }, { status: 400 })
   const { programId, workoutDayId, date, weekNumber, weekType, fridayAlt, sets, runLogs, notes, isPartial } = parsed.body
 
-  const { data: programRaw } = await supabase
-    .from('programs')
-    .select('*')
-    .eq('id', programId)
-    .single()
-
-  const program = programRaw as Program | null
-  if (!program) return NextResponse.json({ error: 'Program not found' }, { status: 404 })
-  if (program.user_id !== user.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+  const owned = await requireProgram(supabase, user, programId)
+  if ('error' in owned) return owned.error
+  const { program } = owned
 
   const { data: weightsArrRaw } = await supabase
     .from('working_weights')

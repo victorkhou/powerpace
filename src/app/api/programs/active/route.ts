@@ -39,7 +39,8 @@ export async function GET(request: NextRequest) {
       if (!seeded) return NextResponse.json({ error: 'Seed failed' }, { status: 500 })
       return buildResponse(seeded as Program, supabase, clientDow, clientDate)
     } catch (e) {
-      return NextResponse.json({ error: String(e) }, { status: 500 })
+      console.error('seedProgram failed', e)
+      return NextResponse.json({ error: 'Failed to initialize program' }, { status: 500 })
     }
   }
 
@@ -55,56 +56,49 @@ async function buildResponse(
   const dayOfWeek = clientDow ?? new Date().getDay()
   const todayDate = clientDate ?? new Date().toISOString().split('T')[0]
 
-  // Load all workout days for the program so an override (which points at any
-  // day_of_week) can resolve, then apply a per-date override if one exists.
-  const { data: allDays } = await supabase
-    .from('workout_days')
-    .select('*')
-    .eq('program_id', program.id)
+  // These four reads are independent — run them concurrently. The exercises
+  // read depends on the resolved workout, so it follows.
+  const [daysRes, overrideRes, weightsRes, todaySessionRes] = await Promise.all([
+    supabase.from('workout_days').select('*').eq('program_id', program.id),
+    supabase.from('schedule_overrides').select('workout_day_id').eq('program_id', program.id).eq('date', todayDate).maybeSingle(),
+    supabase.from('working_weights').select('*').eq('program_id', program.id),
+    supabase.from('sessions').select('id, status, rpe').eq('program_id', program.id).eq('date', todayDate).maybeSingle(),
+  ])
 
-  const days = (allDays ?? []) as WorkoutDay[]
+  // An empty result is fine, but a query error is not — surface it as a 500
+  // rather than rendering an empty/rest-day workout that hides the failure.
+  if (daysRes.error || weightsRes.error) {
+    console.error('active program reads failed', daysRes.error ?? weightsRes.error)
+    return NextResponse.json({ error: 'Failed to load program' }, { status: 500 })
+  }
 
-  const { data: override } = await supabase
-    .from('schedule_overrides')
-    .select('workout_day_id')
-    .eq('program_id', program.id)
-    .eq('date', todayDate)
-    .maybeSingle()
-
-  const overrideId = (override as { workout_day_id: string } | null)?.workout_day_id ?? null
+  const days = (daysRes.data ?? []) as WorkoutDay[]
+  const overrideId = (overrideRes.data as { workout_day_id: string } | null)?.workout_day_id ?? null
   const todayWorkout = resolveWorkoutForDate(days, dayOfWeek, program, overrideId)
 
   let exercises: Exercise[] = []
   if (todayWorkout?.id) {
-    const { data: ex } = await supabase
+    const { data: ex, error: exError } = await supabase
       .from('exercises')
       .select('*')
       .eq('workout_day_id', todayWorkout.id)
       .order('sort_order')
+    if (exError) {
+      console.error('exercises read failed', exError)
+      return NextResponse.json({ error: 'Failed to load workout' }, { status: 500 })
+    }
     exercises = (ex ?? []) as Exercise[]
   }
 
-  const { data: weightsArr } = await supabase
-    .from('working_weights')
-    .select('*')
-    .eq('program_id', program.id)
-
   const weights: Record<string, WorkingWeight> = Object.fromEntries(
-    ((weightsArr ?? []) as WorkingWeight[]).map((w) => [w.key, w])
+    ((weightsRes.data ?? []) as WorkingWeight[]).map((w) => [w.key, w])
   )
-
-  const { data: todaySession } = await supabase
-    .from('sessions')
-    .select('id, status, rpe')
-    .eq('program_id', program.id)
-    .eq('date', todayDate)
-    .maybeSingle()
 
   return NextResponse.json({
     program,
     todayWorkout,
     exercises,
     weights,
-    todaySession,
+    todaySession: todaySessionRes.data,
   })
 }
