@@ -1,0 +1,47 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  checks:
+    name: typecheck · lint · test · build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run test
+      - run: npx tsc --noEmit
+      - run: npm run lint
+      - name: Build
+        run: npm run build
+        env:
+          # next build evaluates client env at compile time; provide harmless
+          # placeholders so the build doesn't fail on missing public vars.
+          NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: placeholder-anon-key
+
+  integration:
+    name: integration (log_session RPC)
+    runs-on: ubuntu-latest
+    # Only runs when the repo has Supabase secrets configured. Skips cleanly on
+    # forks / PRs without secrets instead of failing.
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Run integration tests
+        run: npm run test:integration
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
