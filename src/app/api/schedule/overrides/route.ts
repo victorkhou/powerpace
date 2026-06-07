@@ -101,8 +101,9 @@ export async function GET(request: NextRequest) {
 // resolved workout; if that equals the date's natural workout, the override is
 // cleared instead so the table only holds genuine deviations.
 export async function POST(request: NextRequest) {
-  const { user, supabase, db, error: authError } = await getAuthenticatedUser()
-  if (authError || !user || !supabase) return authError!
+  const auth = await getAuthenticatedUser()
+  if (auth.error) return auth.error
+  const { user, supabase, db } = auth
 
   const body: { dateA?: string; dateB?: string } = await request.json()
   const { dateA, dateB } = body

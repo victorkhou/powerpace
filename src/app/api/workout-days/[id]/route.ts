@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/api-auth'
+import type { Database } from '@/types/database'
+
+type WorkoutDayUpdate = Database['public']['Tables']['workout_days']['Update']
 
 const DAY_TYPES = new Set(['lift', 'run', 'combo', 'rest'])
 const WEEK_TYPES = new Set(['A', 'B', 'both'])
@@ -21,7 +24,7 @@ export async function PATCH(
     variant?: string | null
   } = await request.json()
 
-  const update: Record<string, unknown> = {}
+  const update: WorkoutDayUpdate = {}
   if (body.name !== undefined) {
     if (typeof body.name !== 'string' || !body.name.trim()) {
       return NextResponse.json({ error: 'name must be a non-empty string' }, { status: 400 })
