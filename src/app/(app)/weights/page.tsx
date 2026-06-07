@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useAppStore } from '@/store/app-store'
-import { INCREMENTS, LIFT_LABELS } from '@/lib/progression'
+import { INCREMENTS, LIFT_LABELS, formatVolumePct } from '@/lib/progression'
 import type { WorkingWeight } from '@/types/database'
 import { PlateCalculatorSheet } from '@/components/today/plate-calculator-sheet'
 import { activeProgramQuery } from '@/lib/date'
@@ -104,7 +104,7 @@ export default function WeightsPage() {
                 {LIFT_LABELS[key] ?? key}
               </span>
               {type === 'auto' && (
-                <span style={{ fontFamily: "'DM Mono', monospace", fontSize: '0.55rem', color: '#47c8ff', border: '1px solid #47c8ff', borderRadius: 3, padding: '1px 4px' }}>auto @ 87.5%</span>
+                <span style={{ fontFamily: "'DM Mono', monospace", fontSize: '0.55rem', color: '#47c8ff', border: '1px solid #47c8ff', borderRadius: 3, padding: '1px 4px' }}>auto @ {formatVolumePct(program?.volume_pct)}</span>
               )}
               {ww.weight_lbs >= (ww.pr_lbs ?? 0) && ww.pr_lbs != null && ww.pr_lbs > 0 && (
                 <span style={{ fontFamily: "'DM Mono', monospace", fontSize: '0.55rem', color: '#4aff91', border: '1px solid #4aff91', borderRadius: 3, padding: '1px 4px' }}>PR</span>

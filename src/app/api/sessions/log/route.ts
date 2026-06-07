@@ -184,7 +184,7 @@ export async function POST(request: NextRequest) {
   }
 
   // Recompute auto-derived volume weights (only push genuine changes).
-  const recomputed = recompute(updatedWeights)
+  const recomputed = recompute(updatedWeights, program.volume_pct)
   for (const key of AUTO_KEYS) {
     const newVal = recomputed[key]
     const ww = weightsMap[key]

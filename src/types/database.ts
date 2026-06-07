@@ -126,6 +126,7 @@ export type Database = {
           is_active: boolean
           name: string
           user_id: string
+          volume_pct: number
           week_number: number
           week_type: string
         }
@@ -138,6 +139,7 @@ export type Database = {
           is_active?: boolean
           name: string
           user_id: string
+          volume_pct?: number
           week_number?: number
           week_type?: string
         }
@@ -150,6 +152,7 @@ export type Database = {
           is_active?: boolean
           name?: string
           user_id?: string
+          volume_pct?: number
           week_number?: number
           week_type?: string
         }

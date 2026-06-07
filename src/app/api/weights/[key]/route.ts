@@ -1,14 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/api-auth'
 import { recompute, AUTO_KEYS, PROGRESSABLE } from '@/lib/progression'
+import { requireProgram } from '@/lib/ownership'
 import type { WorkingWeight } from '@/types/database'
 
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ key: string }> }
 ) {
-  const { user, supabase, db, error: authError } = await getAuthenticatedUser()
-  if (authError || !user || !supabase) return authError!
+  const auth = await getAuthenticatedUser()
+  if (auth.error) return auth.error
+  const { user, supabase, db } = auth
 
   const { key } = await params
   const { programId, weightLbs } = await request.json()
@@ -18,14 +20,9 @@ export async function PATCH(
     return NextResponse.json({ error: 'Cannot edit auto-derived weight' }, { status: 400 })
   }
 
-  const { data: program } = await supabase
-    .from('programs')
-    .select('id')
-    .eq('id', programId)
-    .eq('user_id', user.id)
-    .single()
-
-  if (!program) return NextResponse.json({ error: 'Program not found' }, { status: 404 })
+  const owned = await requireProgram(supabase, user, programId)
+  if ('error' in owned) return owned.error
+  const { program } = owned
 
   const { data: wwRaw } = await supabase
     .from('working_weights')
@@ -60,7 +57,7 @@ export async function PATCH(
     const allWeights = (allWeightsRaw ?? []) as WorkingWeight[]
     const map = Object.fromEntries(allWeights.map((w) => [w.key, w.weight_lbs]))
     map[key] = weightLbs
-    const recomputed = recompute(map)
+    const recomputed = recompute(map, program.volume_pct)
     for (const ak of AUTO_KEYS) {
       const newVal = recomputed[ak]
       const existing = allWeights.find((w) => w.key === ak)

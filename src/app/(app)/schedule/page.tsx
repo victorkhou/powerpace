@@ -5,6 +5,7 @@ import { useAppStore } from '@/store/app-store'
 import type { WorkoutDay, Exercise } from '@/types/database'
 import { WeekSwap } from '@/components/schedule/week-swap'
 import { activeProgramQuery } from '@/lib/date'
+import { formatVolumePct } from '@/lib/progression'
 
 const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
@@ -203,7 +204,7 @@ export default function SchedulePage() {
                               </span>
                               {ex.is_auto_volume && (
                                 <div style={{ fontFamily: "'DM Mono', monospace", fontSize: '0.58rem', color: '#47c8ff', marginTop: 2 }}>
-                                  auto @ 87.5%
+                                  auto @ {formatVolumePct(program?.volume_pct)}
                                 </div>
                               )}
                             </div>

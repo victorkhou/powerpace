@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { processLift, recompute, autoVolumeFor, INCREMENTS, AUTO_PARENT } from './progression'
+import { processLift, recompute, autoVolumeFor, formatVolumePct, INCREMENTS, AUTO_PARENT } from './progression'
 
 describe('processLift', () => {
   it('increments by the lift increment and bumps streak on a completed set', () => {
@@ -71,5 +71,26 @@ describe('recompute', () => {
     for (const [volKey, parentKey] of Object.entries(AUTO_PARENT)) {
       expect(out[volKey]).toBe(autoVolumeFor(parentKey, weights[parentKey as keyof typeof weights]))
     }
+  })
+
+  it('applies a custom volume multiplier and rounds to the parent step', () => {
+    // squat step 5: round(220*0.9/5)*5 = round(39.6)*5 = 40*5 = 200
+    expect(autoVolumeFor('squat', 220, 0.9)).toBe(200)
+    // bench step 2.5: round(157.5*0.8/2.5)*2.5 = round(50.4)*2.5 = 50*2.5 = 125
+    expect(autoVolumeFor('bench', 157.5, 0.8)).toBe(125)
+    const out = recompute({ squat: 220, bench: 157.5, incline: 145, ohp: 107.5, row: 120 }, 0.9)
+    expect(out.squatVol).toBe(200)
+  })
+
+  it('defaults to 87.5% when no multiplier is passed', () => {
+    expect(autoVolumeFor('squat', 220)).toBe(autoVolumeFor('squat', 220, 0.875))
+  })
+})
+
+describe('formatVolumePct', () => {
+  it('renders a fraction as a trimmed percentage', () => {
+    expect(formatVolumePct(0.875)).toBe('87.5%')
+    expect(formatVolumePct(0.9)).toBe('90%')
+    expect(formatVolumePct()).toBe('87.5%')
   })
 })

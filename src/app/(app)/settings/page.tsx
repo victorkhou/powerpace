@@ -14,6 +14,7 @@ export default function SettingsPage() {
   const router = useRouter()
   const [weekInput, setWeekInput] = useState('')
   const [deloadInput, setDeloadInput] = useState('')
+  const [volumeInput, setVolumeInput] = useState('')
   const [saving, setSaving] = useState(false)
   const [loading, setLoading] = useState(!activeProgram)
 
@@ -33,6 +34,8 @@ export default function SettingsPage() {
     if (program) {
       setWeekInput(String(program.week_number))
       setDeloadInput(program.deload_week != null ? String(program.deload_week) : '')
+      // Stored as a fraction (0.875); shown as a percentage (87.5).
+      setVolumeInput(String(Math.round(program.volume_pct * 1000) / 10))
     }
   }, [program])
 
@@ -61,6 +64,21 @@ export default function SettingsPage() {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ programId: program.id, deloadWeek }),
+    })
+    const res = await fetch(`/api/programs/active${activeProgramQuery()}`)
+    if (res.ok) setActiveProgram(await res.json())
+    setSaving(false)
+  }
+
+  async function saveVolumePct() {
+    if (!program) return
+    const pct = parseFloat(volumeInput)
+    if (isNaN(pct) || pct <= 0 || pct > 100) return
+    setSaving(true)
+    await fetch('/api/programs/settings', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ programId: program.id, volumePct: pct / 100 }),
     })
     const res = await fetch(`/api/programs/active${activeProgramQuery()}`)
     if (res.ok) setActiveProgram(await res.json())
@@ -186,6 +204,32 @@ export default function SettingsPage() {
             </button>
             <span style={{ fontFamily: "'DM Mono', monospace", fontSize: '0.6rem', color: '#555' }}>
               (blank = none)
+            </span>
+          </div>
+
+          {/* Volume % — multiplier for auto-derived volume weights */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 12 }}>
+            <label style={{ fontFamily: "'DM Mono', monospace", fontSize: '0.7rem', color: '#888', flexShrink: 0 }}>
+              volume %:
+            </label>
+            <input
+              type="number"
+              value={volumeInput}
+              onChange={(e) => setVolumeInput(e.target.value)}
+              min={1}
+              max={100}
+              step={0.5}
+              style={{ width: 56, height: 36, textAlign: 'center', backgroundColor: '#181818', border: '1px solid #333', borderRadius: 4, color: '#d0d0d0', fontFamily: "'DM Mono', monospace", fontSize: '0.85rem' }}
+            />
+            <button
+              onClick={saveVolumePct}
+              disabled={saving}
+              style={{ padding: '6px 12px', borderRadius: 4, border: '1px solid #333', backgroundColor: '#181818', color: '#d0d0d0', fontFamily: "'DM Mono', monospace", fontSize: '0.7rem', cursor: 'pointer', minHeight: 36 }}
+            >
+              {saving ? '...' : 'save'}
+            </button>
+            <span style={{ fontFamily: "'DM Mono', monospace", fontSize: '0.6rem', color: '#555' }}>
+              (of intensity; recalcs now)
             </span>
           </div>
 

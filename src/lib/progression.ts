@@ -34,17 +34,25 @@ const AUTO_STEP: Record<string, number> = {
   rowVol: 5,
 }
 
-export function recompute(w: Record<string, number>): Record<string, number> {
+// Default volume multiplier (Texas Method). Programs can override via volume_pct.
+export const DEFAULT_VOLUME_PCT = 0.875
+
+/** Renders a stored fraction (0.875) as a trimmed percentage string ("87.5%"). */
+export function formatVolumePct(volumePct: number = DEFAULT_VOLUME_PCT): string {
+  return `${(Math.round(volumePct * 1000) / 10)}%`
+}
+
+export function recompute(w: Record<string, number>, volumePct: number = DEFAULT_VOLUME_PCT): Record<string, number> {
   const out = { ...w }
   for (const [volKey, parentKey] of Object.entries(AUTO_PARENT)) {
-    if (w[parentKey] != null) out[volKey] = autoVolumeFor(parentKey, w[parentKey])
+    if (w[parentKey] != null) out[volKey] = autoVolumeFor(parentKey, w[parentKey], volumePct)
   }
   return out
 }
 
-export function autoVolumeFor(parentKey: string, parentWeight: number): number {
+export function autoVolumeFor(parentKey: string, parentWeight: number, volumePct: number = DEFAULT_VOLUME_PCT): number {
   const step = AUTO_STEP[`${parentKey}Vol`] ?? 5
-  return Math.round((parentWeight * 0.875) / step) * step
+  return Math.round((parentWeight * volumePct) / step) * step
 }
 
 export type LiftResult =

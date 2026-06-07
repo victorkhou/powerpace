@@ -4,7 +4,7 @@ import { SetBox } from './set-box'
 import type { Exercise, WorkingWeight } from '@/types/database'
 import { useSessionStore } from '@/store/session-store'
 import { useTimerStore } from '@/store/timer-store'
-import { getRestSeconds } from '@/lib/progression'
+import { getRestSeconds, formatVolumePct } from '@/lib/progression'
 import { Input } from '@/components/ui/input'
 import { PlateCalculatorSheet } from './plate-calculator-sheet'
 import { useEffect, useState } from 'react'
@@ -14,9 +14,10 @@ type Props = {
   weight: WorkingWeight | null
   disabled?: boolean
   isVolumeDay: boolean
+  volumePct?: number
 }
 
-export function ExerciseCard({ exercise, weight, disabled, isVolumeDay }: Props) {
+export function ExerciseCard({ exercise, weight, disabled, isVolumeDay, volumePct }: Props) {
   const { sets, toggleSet, initExercise, setPace, paceInputs } = useSessionStore()
   const [plateSheetOpen, setPlateSheetOpen] = useState(false)
 
@@ -92,7 +93,7 @@ export function ExerciseCard({ exercise, weight, disabled, isVolumeDay }: Props)
                   letterSpacing: '0.05em',
                 }}
               >
-                AUTO @ 87.5%
+                AUTO @ {formatVolumePct(volumePct)}
               </span>
             )}
             {isPR && !exercise.is_auto_volume && (

@@ -15,6 +15,7 @@ import type { ChangeEntry } from '@/app/api/sessions/log/route'
 import type { ActiveProgram } from '@/store/app-store'
 import { localDateKey } from '@/lib/date'
 import { optimisticMutate } from '@/lib/optimistic'
+import { formatVolumePct } from '@/lib/progression'
 
 export default function TodayPage() {
   const router = useRouter()
@@ -331,7 +332,7 @@ export default function TodayPage() {
               letterSpacing: '0.05em',
             }}
           >
-            {isVolumeDay ? '5×5 @ 87.5% — VOLUME' : '3×5 — PR ATTEMPT'}
+            {isVolumeDay ? `VOLUME @ ${formatVolumePct(program?.volume_pct)}` : 'PR ATTEMPT'}
           </div>
         )}
       </div>
@@ -350,6 +351,7 @@ export default function TodayPage() {
               weight={ex.weight_key ? (weights[ex.weight_key] ?? null) : null}
               disabled={sessionLogged}
               isVolumeDay={isVolumeDay}
+              volumePct={program?.volume_pct}
             />
           ))
         )}
