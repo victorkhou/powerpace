@@ -1,8 +1,10 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useAppStore } from '@/store/app-store'
 import type { WorkoutDay, Exercise } from '@/types/database'
+import { WeekSwap } from '@/components/schedule/week-swap'
+import { activeProgramQuery } from '@/lib/date'
 
 const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
@@ -16,7 +18,7 @@ const TYPE_COLOR: Record<string, string> = {
 type DayWithExercises = WorkoutDay & { exercises: Exercise[] }
 
 export default function SchedulePage() {
-  const { activeProgram } = useAppStore()
+  const { activeProgram, setActiveProgram } = useAppStore()
   const [viewWeek, setViewWeek] = useState<'A' | 'B'>('A')
   const [expandedDay, setExpandedDay] = useState<string | null>(null)
   const [days, setDays] = useState<DayWithExercises[]>([])
@@ -42,6 +44,13 @@ export default function SchedulePage() {
     }
     load()
   }, [])
+
+  // After a swap, refresh the cached active program so the Today page reflects
+  // the new resolved workout for the current date.
+  const handleSwapChanged = useCallback(async () => {
+    const res = await fetch(`/api/programs/active${activeProgramQuery()}`)
+    if (res.ok) setActiveProgram(await res.json())
+  }, [setActiveProgram])
 
   if (loading) {
     return (
@@ -101,8 +110,16 @@ export default function SchedulePage() {
         </div>
       </div>
 
+      {/* This-week swap */}
+      <div style={{ paddingTop: 12 }}>
+        <WeekSwap onChanged={handleSwapChanged} />
+      </div>
+
       {/* Day cards */}
       <div style={{ padding: '12px 16px 0' }}>
+        <p style={{ fontFamily: "'DM Mono', monospace", fontSize: '0.6rem', color: '#444', marginBottom: 10, lineHeight: 1.4 }}>
+          recurring template (Week {viewWeek}). this-week swaps above override individual dates without changing the template.
+        </p>
         {displayDays.map((day) => {
           const isToday = day.day_of_week === todayDow && viewWeek === program?.week_type
           const isExpanded = expandedDay === day.id

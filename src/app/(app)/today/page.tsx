@@ -74,10 +74,14 @@ export default function TodayPage() {
   const todayWorkout = activeProgram?.todayWorkout
   const exercises = activeProgram?.exercises ?? []
   const weights = activeProgram?.weights ?? {}
-  const dow = todayWorkout?.day_of_week
   const isWeekA = program?.week_type === 'A'
-  const isVariantDay = (dow === 2 || dow === 5) && isWeekA
-  const willAdvanceFridayAlt = dow === 5 && isWeekA
+  // friday_alt is anchored to the real calendar date on the server (a swapped
+  // workout does not move the alternation), so derive these from loadedDate —
+  // not the resolved workout's template slot — to stay consistent.
+  const calendarDow = loadedDate ? new Date(`${loadedDate}T00:00:00`).getDay() : null
+  const willAdvanceFridayAlt = calendarDow === 5 && isWeekA
+  // The variant the user is actually performing comes from the resolved workout.
+  const performedVariant = todayWorkout?.variant ?? null
   const isVolumeDay = todayWorkout?.is_volume === true
 
   // Compute total sets and completed sets across progressable exercises
@@ -143,7 +147,7 @@ export default function TodayPage() {
           date: today,
           weekNumber: program.week_number,
           weekType: program.week_type,
-          fridayAlt: isVariantDay ? program.friday_alt : null,
+          fridayAlt: performedVariant,
           sets: setsPayload,
           runLogs: runLogsPayload,
           notes,
@@ -308,9 +312,9 @@ export default function TodayPage() {
             )}
           </div>
         </div>
-        {isVariantDay && (
+        {performedVariant && (
           <div style={{ marginTop: 8, padding: '5px 10px', backgroundColor: 'rgba(232,255,71,0.05)', border: '1px solid #333', borderRadius: 4, fontFamily: "'DM Mono', monospace", fontSize: '0.65rem', color: '#888' }}>
-            {dow === 5 ? 'Friday' : 'Tuesday'} {program?.friday_alt} active{willAdvanceFridayAlt ? ` · next: ${program?.friday_alt === 'A1' ? 'A2' : 'A1'}` : ''}
+            {performedVariant} active{willAdvanceFridayAlt ? ` · next: ${program?.friday_alt === 'A1' ? 'A2' : 'A1'}` : ''}
           </div>
         )}
         {todayWorkout && (todayWorkout.type === 'lift' || todayWorkout.type === 'combo') && (
