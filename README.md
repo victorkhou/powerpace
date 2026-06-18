@@ -1,36 +1,45 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Power + Pace
+
+A strength-training tracker built with Next.js and Supabase. Implements Texas Method–style linear progression with automatic weight management, session logging, and performance history.
+
+## Features
+
+- **Today** — Log workouts with per-set tracking, rest timers, and RPE rating
+- **History** — Browse past sessions; tap to expand and see reps/weights for every set
+- **Weights** — View and manually adjust current working weights
+- **PRs** — Track personal records, streaks, and failure counts per lift
+- **Schedule** — See upcoming workout days and weekly structure
+- **Analytics** — Volume trends and progression insights
+- **Settings** — Configure programs, volume multiplier, and preferences
+
+## Progression Engine
+
+- Linear progression on compound lifts (squat, bench, OHP, deadlift, row, etc.)
+- Auto-derived volume weights (configurable percentage of intensity weight)
+- 3-failure reset with 5% deload, rounded to increment
+- Streak and PR tracking per lift
+
+## Tech Stack
+
+- **Framework**: Next.js (App Router)
+- **Database**: Supabase (Postgres + Auth + RLS)
+- **State**: Zustand (session store with localStorage persistence)
+- **Styling**: Inline styles with DM Mono + Bebas Neue fonts
 
 ## Getting Started
 
-First, run the development server:
-
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000) in your browser.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Environment Variables
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Requires a `.env.local` with Supabase credentials:
 
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```
+NEXT_PUBLIC_SUPABASE_URL=...
+NEXT_PUBLIC_SUPABASE_ANON_KEY=...
+```
