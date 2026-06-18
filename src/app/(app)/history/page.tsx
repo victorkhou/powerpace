@@ -21,6 +21,20 @@ type PREntry = {
   failures: number
 }
 
+type SetDetail = {
+  set: number
+  completed: boolean
+  weight_lbs: number | null
+  reps_target: number
+  reps_actual: number | null
+}
+
+type ExerciseDetail = {
+  name: string
+  weight_key: string | null
+  sets: SetDetail[]
+}
+
 const STATUS_COLOR: Record<string, string> = {
   completed: '#4aff91',
   partial: '#f0a500',
@@ -33,6 +47,9 @@ export default function HistoryPage() {
   const [sessions, setSessions] = useState<SessionRow[]>([])
   const [prs, setPrs] = useState<PREntry[]>([])
   const [loading, setLoading] = useState(true)
+  const [expandedId, setExpandedId] = useState<string | null>(null)
+  const [detailCache, setDetailCache] = useState<Record<string, ExerciseDetail[]>>({})
+  const [detailLoading, setDetailLoading] = useState<string | null>(null)
 
   useEffect(() => {
     async function load() {
@@ -47,6 +64,23 @@ export default function HistoryPage() {
     }
     load()
   }, [])
+
+  async function toggleExpand(id: string) {
+    if (expandedId === id) {
+      setExpandedId(null)
+      return
+    }
+    setExpandedId(id)
+    if (!detailCache[id]) {
+      setDetailLoading(id)
+      const res = await fetch(`/api/history/sessions/${id}`)
+      if (res.ok) {
+        const data: ExerciseDetail[] = await res.json()
+        setDetailCache((prev) => ({ ...prev, [id]: data }))
+      }
+      setDetailLoading(null)
+    }
+  }
 
   if (loading) {
     return (
@@ -105,12 +139,14 @@ export default function HistoryPage() {
             sessions.map((s) => (
               <div
                 key={s.id}
+                onClick={() => toggleExpand(s.id)}
                 style={{
                   padding: '12px 14px',
                   backgroundColor: '#0f0f0f',
-                  border: '1px solid #181818',
+                  border: `1px solid ${expandedId === s.id ? '#333' : '#181818'}`,
                   borderRadius: 4,
                   marginBottom: 8,
+                  cursor: 'pointer',
                 }}
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -149,6 +185,42 @@ export default function HistoryPage() {
                     )}
                   </div>
                 </div>
+
+                {expandedId === s.id && (
+                  <div style={{ marginTop: 10, borderTop: '1px solid #222', paddingTop: 10 }}>
+                    {detailLoading === s.id ? (
+                      <span style={{ fontFamily: "'DM Mono', monospace", color: '#555', fontSize: '0.65rem' }}>loading...</span>
+                    ) : (detailCache[s.id] ?? []).length === 0 ? (
+                      <span style={{ fontFamily: "'DM Mono', monospace", color: '#444', fontSize: '0.65rem' }}>No set data recorded.</span>
+                    ) : (
+                      (detailCache[s.id] ?? []).map((ex, i) => (
+                        <div key={i} style={{ marginBottom: 8 }}>
+                          <div style={{ fontFamily: "'DM Mono', monospace", fontSize: '0.7rem', color: '#aaa', marginBottom: 3 }}>
+                            {LIFT_LABELS[ex.weight_key ?? ''] ?? ex.name}
+                          </div>
+                          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                            {ex.sets.map((set) => (
+                              <div
+                                key={set.set}
+                                style={{
+                                  fontFamily: "'DM Mono', monospace",
+                                  fontSize: '0.6rem',
+                                  padding: '3px 6px',
+                                  borderRadius: 3,
+                                  backgroundColor: set.completed ? '#1a2e1a' : '#2e1a1a',
+                                  border: `1px solid ${set.completed ? '#2a4a2a' : '#4a2a2a'}`,
+                                  color: set.completed ? '#4aff91' : '#ff6b6b',
+                                }}
+                              >
+                                {set.weight_lbs != null ? `${set.weight_lbs}lbs` : 'BW'} × {set.reps_actual ?? set.reps_target}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                )}
               </div>
             ))
           )
