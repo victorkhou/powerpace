@@ -1,0 +1,9 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+
+# Secrets (also covered by the repo-root .env* rule; kept here for clarity)
+.env

@@ -1,0 +1,76 @@
+# PowerPace Coach — agent sidecar
+
+A Python sidecar that adds an AI **training coach** to PowerPace. Built as a
+learning vehicle for: agent abstraction (LangChain), observability (LangSmith),
+evals (LangSmith datasets), and orchestration (LangGraph) — provider-neutral, so
+a second model provider drops in without rewriting tools.
+
+```
+Next.js (/api/coach)  ──▶  FastAPI sidecar  ──▶  LangGraph agent ──▶ Supabase (read-only)
+                                              └─▶ LangSmith (tracing + evals)
+```
+
+## Setup
+
+```bash
+cd agent
+python -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+cp .env.example .env        # then fill in the values
+```
+
+Fill `.env`:
+- `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` — service-role key, **server-side only**.
+  Find it in Supabase → Project Settings → API. Never put it in the Next.js client.
+- `ANTHROPIC_API_KEY`
+- `LANGSMITH_API_KEY` (+ keep `LANGSMITH_TRACING=true`) — from https://smith.langchain.com
+
+On the Next.js side, add to `webapp/.env.local`:
+- `COACH_SERVICE_URL=http://localhost:8000`
+
+## Run
+
+```bash
+uvicorn app.main:app --reload --port 8000        # sidecar
+# in another shell, the Next.js app as usual (npm run dev)
+```
+
+Smoke test (bypasses Next.js auth — uses a real user_id from your DB):
+
+```bash
+curl -s localhost:8000/coach \
+  -H 'Content-Type: application/json' \
+  -d '{"user_id":"<a real user uuid>","question":"What is my bench PR?"}' | jq
+```
+
+Then open https://smith.langchain.com and watch the trace appear.
+
+Multi-turn memory — reuse `thread_id` across calls to keep conversation context
+(omit it and the graph defaults the thread to `user_id`):
+
+```bash
+curl -s localhost:8000/coach -H 'Content-Type: application/json' \
+  -d '{"user_id":"<uuid>","thread_id":"chat-1","question":"What is my bench PR?"}' | jq
+curl -s localhost:8000/coach -H 'Content-Type: application/json' \
+  -d '{"user_id":"<uuid>","thread_id":"chat-1","question":"And how does that compare to my squat?"}' | jq
+```
+
+## The learning path (each phase is runnable on its own)
+
+| Phase | Goal | Files | What you learn |
+|---|---|---|---|
+| 0 ✅ | Wiring + tracing | `main.py`, `graph.py`, `config.py` | One Claude call end-to-end; LangSmith traces it automatically |
+| 1 ✅ | Working coach | `tools.py`, `db.py` | LangChain tools + prebuilt ReAct agent over your real data |
+| 2 ✅ | Custom graph | `graph.py` | Explicit `StateGraph` (state + reducer, agent/tools nodes, conditional edge) + `MemorySaver` checkpointer for multi-turn memory via `thread_id` |
+| 3 | Evals | `evals/run_evals.py` | Datasets from your DB; exact-match + LLM-as-judge (Haiku) evaluators |
+| 4 | Multi-provider | `config.py` | Swap `COACH_MODEL` to another provider; re-run the same eval suite; compare |
+
+Models: `claude-opus-4-8` for the coach, `claude-haiku-4-5` for eval grading.
+
+## Safety
+
+- Every DB tool is **read-only** (SELECT). The agent cannot write.
+- `user_id` is injected per-request from the authenticated Next.js session — it is
+  not a tool argument and not taken from the client body.
+- Secrets live only in `agent/.env` (git-ignored); the service-role key is never
+  shipped to the browser.
