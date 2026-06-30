@@ -20,5 +20,17 @@ class Settings(BaseSettings):
     coach_model: str = "anthropic:claude-opus-4-8"
     judge_model: str = "anthropic:claude-haiku-4-5"
 
+    # ── Hardening knobs (see graph.py / main.py) ──
+    # Shared secret the Next.js route must present. Empty = auth disabled (local
+    # dev only); main.py refuses to start auth-disabled unless COACH_ENV=development.
+    coach_shared_secret: str = ""
+    # Kill-switch: set false to disable the LLM path without redeploying.
+    coach_enabled: bool = True
+    # Bound the blast radius of one turn on a paid LLM.
+    coach_max_tokens: int = 2048          # per-response output cap
+    coach_request_timeout: float = 60.0   # seconds per model call
+    coach_recursion_limit: int = 12       # max agent<->tools hops before bailing
+    coach_max_question_chars: int = 4000  # reject oversized prompts before the model
+
 
 settings = Settings()  # raises at import time if a required var is missing — fail fast

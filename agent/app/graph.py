@@ -26,6 +26,7 @@ from typing import Annotated, TypedDict
 from langchain.chat_models import init_chat_model
 from langchain_core.messages import AnyMessage, SystemMessage
 from langgraph.checkpoint.memory import MemorySaver
+from langgraph.errors import GraphRecursionError
 from langgraph.graph import END, START, StateGraph
 from langgraph.graph.message import add_messages
 from langgraph.prebuilt import ToolNode, tools_condition
@@ -67,9 +68,17 @@ def build_coach(user_id: str):
     The model and tools are the SAME as Phase 1 — only the orchestration is now
     explicit. init_chat_model(settings.coach_model) keeps the provider swap
     (Phase 4) a one-string change; bind_tools tells the model which tools exist.
+
+    The model is bounded: max_tokens caps per-response output, and timeout caps
+    how long a single model call may hang (so a wedged upstream can't pin a
+    worker forever). Both are configurable in config.py.
     """
     tools = build_tools(user_id)
-    model = init_chat_model(settings.coach_model).bind_tools(tools)
+    model = init_chat_model(
+        settings.coach_model,
+        max_tokens=settings.coach_max_tokens,
+        timeout=settings.coach_request_timeout,
+    ).bind_tools(tools)
 
     def agent_node(state: CoachState) -> dict:
         """The reasoning node: prepend the system prompt, call the model, return
@@ -93,6 +102,12 @@ def build_coach(user_id: str):
     return graph.compile(checkpointer=_checkpointer)
 
 
+class CoachLimitError(RuntimeError):
+    """Raised when a turn exceeds the agent<->tools recursion limit — i.e. the
+    model kept calling tools without converging. Callers should surface a
+    graceful message rather than a 500."""
+
+
 async def ask(user_id: str, question: str, thread_id: str | None = None) -> str:
     """Run one turn through the graph.
 
@@ -100,11 +115,24 @@ async def ask(user_id: str, question: str, thread_id: str | None = None) -> str:
     saved state (multi-turn memory); a new one starts fresh. We default it to the
     user_id so a given user has one rolling conversation until you pass something
     else (e.g. a per-chat-session id).
+
+    recursion_limit caps how many agent<->tools hops one turn may take. Without it,
+    a model that loops on tool calls would run up to LangGraph's default (25) — ~25
+    uncapped paid model calls — before erroring. We bound it and translate the
+    overflow into a typed CoachLimitError.
     """
     agent = build_coach(user_id)
-    config = {"configurable": {"thread_id": thread_id or user_id}}
-    result = await agent.ainvoke(
-        {"messages": [{"role": "user", "content": question}]},
-        config,
-    )
+    config = {
+        "configurable": {"thread_id": thread_id or user_id},
+        "recursion_limit": settings.coach_recursion_limit,
+    }
+    try:
+        result = await agent.ainvoke(
+            {"messages": [{"role": "user", "content": question}]},
+            config,
+        )
+    except GraphRecursionError as exc:
+        raise CoachLimitError(
+            "The coach couldn't converge on an answer within its step budget."
+        ) from exc
     return result["messages"][-1].content
