@@ -67,10 +67,28 @@ curl -s localhost:8000/coach -H 'Content-Type: application/json' \
 
 Models: `claude-opus-4-8` for the coach, `claude-haiku-4-5` for eval grading.
 
+## Tests
+
+```bash
+cd agent && pytest
+```
+
+Unit tests under `tests/` mock Supabase, Anthropic, and LangSmith, so they need
+**no `.env`, no DB, and no network** — they run in CI on every push (the `coach`
+job in `.github/workflows/ci.yml`). They cover the deterministic, drift-prone
+plumbing: `db.py` query/edge-case handling, tool JSON serialization, and the eval
+harness's `_fmt` / `pr_correct` / `grounded`-parser logic. The LangSmith evals
+(`python -m evals.run_evals`) are a separate, live groundedness harness — not
+unit tests.
+
 ## Safety
 
 - Every DB tool is **read-only** (SELECT). The agent cannot write.
 - `user_id` is injected per-request from the authenticated Next.js session — it is
-  not a tool argument and not taken from the client body.
+  not a tool argument and not taken from the client body. The sidecar additionally
+  requires a shared secret (`COACH_SHARED_SECRET`) and refuses to start
+  auth-disabled unless `COACH_ENV=development`.
+- The LLM path is bounded: per-response `max_tokens`, a request timeout, a graph
+  recursion limit, and a `COACH_ENABLED` kill-switch.
 - Secrets live only in `agent/.env` (git-ignored); the service-role key is never
   shipped to the browser.

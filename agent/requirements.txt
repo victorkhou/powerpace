@@ -11,6 +11,9 @@ pydantic>=2.9.0
 pydantic-settings>=2.5.0
 python-dotenv>=1.0.0
 
+# Tests (no DB / no secrets required — all external calls are mocked)
+pytest>=8.0.0
+
 # Data access (read-only queries against Supabase/Postgres)
 supabase>=2.9.0
 

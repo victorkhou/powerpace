@@ -28,6 +28,22 @@ jobs:
           NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
           NEXT_PUBLIC_SUPABASE_ANON_KEY: placeholder-anon-key
 
+  coach:
+    name: coach sidecar (pytest)
+    runs-on: ubuntu-latest
+    # Hermetic: the agent/ tests mock Supabase, Anthropic, and LangSmith, so this
+    # needs no secrets, no DB, and no network — it always runs.
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - run: pip install -r agent/requirements.txt
+      - name: Run coach unit tests
+        run: pytest
+        working-directory: agent
+
   integration:
     name: integration (log_session RPC)
     runs-on: ubuntu-latest
