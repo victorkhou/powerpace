@@ -47,8 +47,11 @@ def build_examples() -> list[dict]:
     examples: list[dict] = []
 
     # Factual: one PR question per tracked lift that has a recorded PR.
+    # `labels` is DB-derived; the intensity lifts are those whose key is NOT a
+    # volume key (volume keys end in "Vol" and inherit their parent's name).
+    labels = db.lift_labels(USER_ID)
     for lift in db.get_progression_state(USER_ID):
-        if lift["key"] not in db.LIFT_LABELS or not lift.get("pr_lbs"):
+        if lift["key"] not in labels or lift["key"].endswith("Vol") or not lift.get("pr_lbs"):
             continue  # only the named main lifts; skip volume keys / unset PRs
         examples.append({
             "inputs": {"question": f"What is my {lift['label']} PR?"},

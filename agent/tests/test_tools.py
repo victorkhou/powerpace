@@ -14,8 +14,14 @@ def test_build_tools_returns_expected_toolset():
     names = {t.name for t in tools.build_tools("user-1")}
     assert names == {
         "get_personal_record", "get_recent_sessions",
-        "get_progression_state", "get_volume_trend",
+        "get_progression_state", "get_volume_trend", "get_program_rules",
     }
+
+
+def test_get_program_rules_returns_json():
+    with patch.object(tools.db, "program_rules", return_value={"volume_pct": 0.9}):
+        out = _get(tools.build_tools("u"), "get_program_rules").invoke({})
+    assert json.loads(out)["volume_pct"] == 0.9
 
 
 def test_get_personal_record_returns_json_on_hit():

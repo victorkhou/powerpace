@@ -20,8 +20,9 @@ def build_tools(user_id: str):
     @tool
     def get_personal_record(lift_key: str) -> str:
         """Get the personal record (PR), current working weight, win streak, and
-        failure count for a single lift. lift_key is one of: squat, bench, incline,
-        cgbp, ohp, deadlift, row, rdl, goodMornings."""
+        failure count for a single lift, by its weight_key (e.g. squat, bench, ohp).
+        If unsure which keys exist, call get_progression_state first — it lists
+        every tracked lift's key and label."""
         rec = db.get_pr(user_id, lift_key)
         return json.dumps(rec) if rec else f"No data for lift '{lift_key}'."
 
@@ -34,8 +35,8 @@ def build_tools(user_id: str):
     @tool
     def get_progression_state() -> str:
         """Get current working weight, PR, streak, and failure count for ALL tracked
-        lifts at once. Use to assess overall progress or spot lifts near a deload
-        (failures climbing toward 3 triggers a reset)."""
+        lifts at once. Use to assess overall progress or spot lifts near a deload.
+        Each row includes the deload threshold via get_program_rules."""
         return json.dumps(db.get_progression_state(user_id))
 
     @tool
@@ -44,4 +45,14 @@ def build_tools(user_id: str):
         Use for trend questions like 'is my volume going up'."""
         return json.dumps(db.get_volume_trend(user_id, limit))
 
-    return [get_personal_record, get_recent_sessions, get_progression_state, get_volume_trend]
+    @tool
+    def get_program_rules() -> str:
+        """Get THIS program's actual progression rules: per-lift weight increments,
+        the deload failure threshold and reset formula, and the program's real
+        volume-day multiplier (volume_pct, which can differ from the default).
+        ALWAYS call this before stating any progression rule, increment, deload
+        percentage, or volume percentage — do not recite rules from memory."""
+        return json.dumps(db.program_rules(user_id))
+
+    return [get_personal_record, get_recent_sessions, get_progression_state,
+            get_volume_trend, get_program_rules]
