@@ -24,13 +24,14 @@ Four concepts to learn here:
 from typing import Annotated, TypedDict
 
 from langchain.chat_models import init_chat_model
-from langchain_core.messages import AnyMessage, SystemMessage
+from langchain_core.messages import AIMessage, AnyMessage, HumanMessage, SystemMessage, ToolMessage
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.errors import GraphRecursionError
 from langgraph.graph import END, START, StateGraph
 from langgraph.graph.message import add_messages
 from langgraph.prebuilt import ToolNode, tools_condition
 
+from . import groundedness
 from .config import settings
 from .tools import build_tools
 
@@ -53,8 +54,12 @@ class CoachState(TypedDict):
     returns {"messages": [...]}, LangGraph APPENDS those to the existing list
     (and dedupes by id) instead of replacing it. That's what lets the loop
     accumulate user → assistant(tool_calls) → tool results → assistant(answer).
+
+    grounding_attempts counts how many times the verify node has sent the answer
+    back for regeneration this turn — it bounds the verify↔agent loop.
     """
     messages: Annotated[list[AnyMessage], add_messages]
+    grounding_attempts: int
 
 
 # A single in-process checkpointer shared across requests. Keyed by thread_id,
@@ -63,6 +68,17 @@ class CoachState(TypedDict):
 # Swap for a persistent checkpointer (e.g. langgraph SqliteSaver/PostgresSaver)
 # when you want memory to survive restarts.
 _checkpointer = MemorySaver()
+
+# The groundedness judge — cheap model (claude-haiku-4-5), built once on first use.
+# Lazy so importing this module constructs no model (keeps tests/CI hermetic).
+_judge_singleton = None
+
+
+def _judge():
+    global _judge_singleton
+    if _judge_singleton is None:
+        _judge_singleton = init_chat_model(settings.judge_model)
+    return _judge_singleton
 
 
 def build_coach(user_id: str):
@@ -94,13 +110,62 @@ def build_coach(user_id: str):
     # the results as ToolMessages — the manual equivalent of the Phase 1 loop body.
     tool_node = ToolNode(tools)
 
+    def verify_node(state: CoachState) -> dict:
+        """Inline groundedness guard. Runs after the agent produces a FINAL answer
+        (no tool calls). Judges the answer against THIS turn's tool outputs; if it
+        fabricated something, append a corrective instruction and bump the attempt
+        counter so the routing edge sends it back to `agent` to redo the answer.
+
+        Prompt instructions alone failed to stop the volume-trend hallucination —
+        this is the structural backstop. The judge call adds latency only on final
+        answers (once per turn), not on every tool hop."""
+        answer = state["messages"][-1].content
+        # Gather the tool outputs produced this turn (since the last human turn).
+        tool_outputs: list[str] = []
+        for msg in reversed(state["messages"][:-1]):
+            if isinstance(msg, HumanMessage):
+                break
+            if isinstance(msg, ToolMessage):
+                tool_outputs.append(str(msg.content))
+        tool_outputs.reverse()
+
+        # Nothing was retrieved → nothing to fabricate against; accept as-is.
+        if not tool_outputs:
+            return {}
+
+        grounded, _verdict = groundedness.check(_judge(), answer, tool_outputs)
+        attempts = state.get("grounding_attempts", 0)
+        # Accept if grounded, OR if we've used up our retry budget (give up
+        # gracefully and return the last attempt rather than looping forever).
+        if grounded or attempts >= settings.coach_grounding_retries:
+            return {}
+
+        # Ungrounded and budget remains: push a corrective instruction and bump the
+        # counter. after_verify will route back to `agent` to redo the answer.
+        correction = HumanMessage(
+            "Your previous answer included a figure or detail that is NOT in the "
+            "tool results above. Re-answer using ONLY values present in those "
+            "results. If a data point (e.g. a recent session) isn't there, do not "
+            "invent it — say it isn't recorded."
+        )
+        return {"messages": [correction], "grounding_attempts": attempts + 1}
+
+    def after_verify(state: CoachState) -> str:
+        """Route out of verify: a trailing corrective HumanMessage means the answer
+        was rejected with retry budget left → back to `agent`. Otherwise done.
+        (verify_node only appends the correction when it intends to retry, so the
+        final answer is always the last AI message when we reach END.)"""
+        return "agent" if isinstance(state["messages"][-1], HumanMessage) else END
+
     graph = StateGraph(CoachState)
     graph.add_node("agent", agent_node)
     graph.add_node("tools", tool_node)
+    graph.add_node("verify", verify_node)
     graph.add_edge(START, "agent")
-    # tools_condition: if the last message has tool_calls → "tools", else → END.
-    graph.add_conditional_edges("agent", tools_condition)
+    # After the agent: tool calls → "tools"; a final answer → "verify" (not END).
+    graph.add_conditional_edges("agent", tools_condition, {"tools": "tools", END: "verify"})
     graph.add_edge("tools", "agent")  # after running tools, loop back to reason again
+    graph.add_conditional_edges("verify", after_verify, {"agent": "agent", END: END})
 
     return graph.compile(checkpointer=_checkpointer)
 
@@ -131,11 +196,17 @@ async def ask(user_id: str, question: str, thread_id: str | None = None) -> str:
     }
     try:
         result = await agent.ainvoke(
-            {"messages": [{"role": "user", "content": question}]},
+            {"messages": [{"role": "user", "content": question}], "grounding_attempts": 0},
             config,
         )
     except GraphRecursionError as exc:
         raise CoachLimitError(
             "The coach couldn't converge on an answer within its step budget."
         ) from exc
+    # Return the final assistant answer. After the verify loop the last message is
+    # normally the AI answer, but scan from the end for the last AIMessage with
+    # text content to be robust regardless of how the turn ended.
+    for msg in reversed(result["messages"]):
+        if isinstance(msg, AIMessage) and isinstance(msg.content, str) and msg.content.strip():
+            return msg.content
     return result["messages"][-1].content

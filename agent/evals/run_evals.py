@@ -70,7 +70,10 @@ def build_examples() -> list[dict]:
     })
     examples.append({
         "inputs": {"question": "Is my training volume trending up or down recently?"},
-        "outputs": {"context": {"volume_trend": db.get_volume_trend(USER_ID, 10)}},
+        # Use the SAME window the coach's tool defaults to (limit=20). If the
+        # reference and the coach see different-sized windows, the judge flags a
+        # boundary-row "contradiction" that is really just a window mismatch.
+        "outputs": {"context": {"volume_trend": db.get_volume_trend(USER_ID)}},
         "metadata": {"kind": "analysis"},
     })
     return examples

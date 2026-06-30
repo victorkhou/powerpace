@@ -139,7 +139,14 @@ def get_progression_state(user_id: str) -> list[dict]:
 
 
 def get_volume_trend(user_id: str, limit: int = 20) -> list[dict]:
-    """Per-session total volume over time (oldest first), for trend analysis."""
+    """The most recent `limit` sessions' volume, returned oldest-first for trend
+    analysis.
+
+    IMPORTANT: order DESC then limit then reverse — we want the newest N sessions.
+    Ordering ASC + limit would return the *oldest* N and silently drop the most
+    recent session (the one a "recent trend" question cares about most). That bug
+    previously made the coach's view and the eval's reference disagree on whether
+    the latest session existed."""
     pid = active_program_id(user_id)
     if not pid:
         return []
@@ -147,6 +154,6 @@ def get_volume_trend(user_id: str, limit: int = 20) -> list[dict]:
         _client().table("sessions")
         .select("date, week_number, volume_lbs")
         .eq("program_id", pid).neq("status", "undone")
-        .order("date", desc=False).limit(limit).execute()
+        .order("date", desc=True).limit(limit).execute()
     )
-    return res.data or []
+    return list(reversed(res.data or []))

@@ -31,6 +31,9 @@ class Settings(BaseSettings):
     coach_request_timeout: float = 60.0   # seconds per model call
     coach_recursion_limit: int = 12       # max agent<->tools hops before bailing
     coach_max_question_chars: int = 4000  # reject oversized prompts before the model
+    # Inline groundedness guard: how many times to regenerate an answer the judge
+    # flags as ungrounded before giving up and returning the last attempt. 0 disables.
+    coach_grounding_retries: int = 1
 
 
 settings = Settings()  # raises at import time if a required var is missing — fail fast

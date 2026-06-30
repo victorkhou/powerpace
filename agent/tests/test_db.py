@@ -82,6 +82,21 @@ def test_get_volume_trend_no_program_returns_empty(fake_client):
         assert db.get_volume_trend("user-1") == []
 
 
+def test_get_volume_trend_returns_newest_n_oldest_first(fake_client):
+    # Supabase returns DESC (newest first); we must reverse to oldest-first WITHOUT
+    # dropping the newest row. Regression for the order-ASC-then-limit bug that hid
+    # the latest session from "recent trend" answers.
+    newest_first = [
+        {"date": "2026-06-28", "volume_lbs": 6075.0},
+        {"date": "2026-06-27", "volume_lbs": 0.0},
+        {"date": "2026-06-16", "volume_lbs": 1912.5},
+    ]
+    with fake_client(_resp([{"id": "prog-1"}]), _resp(newest_first)):
+        rows = db.get_volume_trend("user-1", 3)
+    assert [r["date"] for r in rows] == ["2026-06-16", "2026-06-27", "2026-06-28"]  # oldest→newest
+    assert rows[-1]["date"] == "2026-06-28"  # newest session is present, not dropped
+
+
 # ── lift_labels: DB-derived label map ────────────────────────────────────────
 def test_lift_labels_derives_from_exercises(fake_client):
     # programs lookup → workout_days → exercises

@@ -90,5 +90,9 @@ unit tests.
   auth-disabled unless `COACH_ENV=development`.
 - The LLM path is bounded: per-response `max_tokens`, a request timeout, a graph
   recursion limit, and a `COACH_ENABLED` kill-switch.
+- **Groundedness guard:** a `verify` node checks every final answer against that
+  turn's tool outputs (via the Haiku judge in `groundedness.py`) and regenerates
+  it if the model invented a figure — a structural backstop, since a prompt
+  instruction alone did not stop hallucination. Bounded by `coach_grounding_retries`.
 - Secrets live only in `agent/.env` (git-ignored); the service-role key is never
   shipped to the browser.
