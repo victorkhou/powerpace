@@ -91,11 +91,26 @@ def ensure_dataset(client: Client) -> None:
 
 
 # ── 2. The target: run the coach on one example ─────────────────────────────
-def target(inputs: dict) -> dict:
-    """System under test. A FRESH thread_id per example keeps eval runs isolated —
-    otherwise they'd share the coach's conversation memory and contaminate each other."""
-    answer = asyncio.run(ask(USER_ID, inputs["question"], thread_id=f"eval-{uuid.uuid4()}"))
-    return {"answer": answer}
+def make_target(model_id: str | None = None):
+    """Build the system-under-test callable for a given coach model.
+
+    model_id=None → the configured default (settings.coach_model). Passing a
+    model here is the ONLY change needed to eval a different model/provider — the
+    dataset, evaluators, tools, and prompt are all identical. That's the Phase 4
+    point: the comparison is apples-to-apples by construction.
+
+    A FRESH thread_id per example keeps eval runs isolated — otherwise they'd
+    share the coach's conversation memory and contaminate each other."""
+    def target(inputs: dict) -> dict:
+        answer = asyncio.run(
+            ask(USER_ID, inputs["question"], thread_id=f"eval-{uuid.uuid4()}", model_id=model_id)
+        )
+        return {"answer": answer}
+    return target
+
+
+# Default target for the single-model eval (python -m evals.run_evals).
+target = make_target()
 
 
 # ── 3a. Exact-match evaluator (factual examples) ────────────────────────────

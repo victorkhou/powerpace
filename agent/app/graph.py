@@ -81,12 +81,18 @@ def _judge():
     return _judge_singleton
 
 
-def build_coach(user_id: str):
+def build_coach(user_id: str, model_id: str | None = None):
     """Compile a coach graph for one user.
 
     The model and tools are the SAME as Phase 1 — only the orchestration is now
-    explicit. init_chat_model(settings.coach_model) keeps the provider swap
-    (Phase 4) a one-string change; bind_tools tells the model which tools exist.
+    explicit. init_chat_model(model_id) keeps the provider swap (Phase 4) a
+    one-string change; bind_tools tells the model which tools exist.
+
+    model_id overrides settings.coach_model for a single build — this is the seam
+    Phase 4's comparison harness uses to A/B two models (or two providers) through
+    the exact same graph, tools, and prompt, with NO other code change. A
+    provider-prefixed string ("anthropic:…", "openai:…") is all init_chat_model
+    needs; everything downstream (tools, verify guard, eval) is provider-agnostic.
 
     The model is bounded: max_tokens caps per-response output, and timeout caps
     how long a single model call may hang (so a wedged upstream can't pin a
@@ -94,7 +100,7 @@ def build_coach(user_id: str):
     """
     tools = build_tools(user_id)
     model = init_chat_model(
-        settings.coach_model,
+        model_id or settings.coach_model,
         max_tokens=settings.coach_max_tokens,
         timeout=settings.coach_request_timeout,
     ).bind_tools(tools)
@@ -176,7 +182,8 @@ class CoachLimitError(RuntimeError):
     graceful message rather than a 500."""
 
 
-async def ask(user_id: str, question: str, thread_id: str | None = None) -> str:
+async def ask(user_id: str, question: str, thread_id: str | None = None,
+              model_id: str | None = None) -> str:
     """Run one turn through the graph.
 
     thread_id selects the conversation. Reusing a thread_id replays that thread's
@@ -184,12 +191,15 @@ async def ask(user_id: str, question: str, thread_id: str | None = None) -> str:
     user_id so a given user has one rolling conversation until you pass something
     else (e.g. a per-chat-session id).
 
+    model_id overrides the coach model for this run (Phase 4 comparison harness);
+    defaults to settings.coach_model — the normal /coach path passes nothing.
+
     recursion_limit caps how many agent<->tools hops one turn may take. Without it,
     a model that loops on tool calls would run up to LangGraph's default (25) — ~25
     uncapped paid model calls — before erroring. We bound it and translate the
     overflow into a typed CoachLimitError.
     """
-    agent = build_coach(user_id)
+    agent = build_coach(user_id, model_id)
     config = {
         "configurable": {"thread_id": thread_id or user_id},
         "recursion_limit": settings.coach_recursion_limit,

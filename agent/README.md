@@ -63,7 +63,7 @@ curl -s localhost:8000/coach -H 'Content-Type: application/json' \
 | 1 ✅ | Working coach | `tools.py`, `db.py` | LangChain tools + prebuilt ReAct agent over your real data |
 | 2 ✅ | Custom graph | `graph.py` | Explicit `StateGraph` (state + reducer, agent/tools nodes, conditional edge) + `MemorySaver` checkpointer for multi-turn memory via `thread_id` |
 | 3 ✅ | Evals | `evals/run_evals.py` | Dataset generated from DB ground truth; exact-match (`pr_correct`) + LLM-as-judge (`grounded`, Haiku) evaluators; `python -m evals.run_evals` |
-| 4 | Multi-provider | `config.py` | Swap `COACH_MODEL` to another provider; re-run the same eval suite; compare |
+| 4 ✅ | Multi-provider | `evals/compare_models.py` | Run the same eval suite across N models via one `build_coach(user_id, model_id)` seam; side-by-side scoreboard. Demoed opus-vs-haiku (both 1.00/1.00); a real provider drops in by adding `"provider:model"` to `MODELS` + its package/key |
 
 Models: `claude-opus-4-8` for the coach, `claude-haiku-4-5` for eval grading.
 
