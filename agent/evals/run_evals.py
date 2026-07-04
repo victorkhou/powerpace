@@ -19,6 +19,7 @@ Run (from agent/, with .env populated and EVAL_USER_ID set):
 Docs: https://docs.smith.langchain.com/evaluation
 """
 import asyncio
+import json
 import os
 import uuid
 
@@ -26,7 +27,7 @@ from langchain.chat_models import init_chat_model
 from langsmith import Client, evaluate
 
 from app import env  # noqa: F401 — load .env into os.environ before any SDK reads it
-from app import db
+from app import db, groundedness
 from app.config import settings
 from app.graph import ask
 
@@ -64,7 +65,11 @@ def build_examples() -> list[dict]:
     near_deload = [l for l in state if l["failures"] >= 1]
     examples.append({
         "inputs": {"question": "Which of my lifts are closest to a deload, and why?"},
-        "outputs": {"context": {"lifts_with_failures": near_deload,
+        # Pass the FULL progression state, not just the filtered subset. The coach
+        # calls get_progression_state (which returns all lifts), so it can cite any
+        # lift in its answer. If we only provide the filtered near-deload subset, the
+        # judge flags mentions of non-deload lifts as "absent from data" — a false neg.
+        "outputs": {"context": {"all_lifts": state,
                                 "rule": "3 consecutive failures triggers a deload"}},
         "metadata": {"kind": "analysis"},
     })
@@ -134,33 +139,23 @@ _judge = init_chat_model(settings.judge_model)  # claude-haiku-4-5 — cheap, ru
 def grounded(inputs: dict, outputs: dict, reference_outputs: dict) -> dict:
     """Judge whether an analysis answer is grounded in the reference context.
 
-    Grading "groundedness" is about CONTRADICTION, not completeness: a good coach
-    adds reasoning and framing beyond the raw data, and that must not be penalized.
-    The rubric below makes that explicit, and we ask for the verdict on its own
-    last line so score extraction is robust to the judge explaining first.
+    Delegates to app.groundedness.check — the SAME judge prompt the runtime guard
+    (graph.py verify_node) uses. This is deliberate: previously the eval had its
+    own weaker "contradiction-only" prompt and would PASS an answer that invented
+    an absent fact (e.g. a fabricated "deadlift 400"), while the runtime guard —
+    which fails on absent-OR-contradicting — would reject it. A green eval must
+    predict what the guard does in production, so both now share one definition.
 
     Returns {key, score, comment} so the metric AND its rationale show in LangSmith.
     """
     if "context" not in reference_outputs:
         return {"key": "grounded", "score": 1}  # not an analysis example; skip
-    verdict = _judge.invoke(
-        "You grade whether a strength coach's answer is GROUNDED in the data — "
-        "meaning it does not state numbers or facts that CONTRADICT the data.\n\n"
-        f"QUESTION: {inputs['question']}\n"
-        f"GROUND-TRUTH DATA: {reference_outputs['context']}\n"
-        f"COACH ANSWER: {outputs['answer']}\n\n"
-        "Rules:\n"
-        "- Added coaching insight, framing, or reasoning that goes BEYOND the data "
-        "is fine and must NOT lower the grade.\n"
-        "- Only fail the answer if it states a number or fact that the data "
-        "directly contradicts (e.g. wrong PR, claims 'up' when data is clearly down).\n\n"
-        "First give a one-sentence reason, then on a FINAL separate line write "
-        "exactly GROUNDED or NOT_GROUNDED."
+    # check() takes a list of "tool output" strings; the eval's ground-truth
+    # context is the equivalent data, so pass it as a single serialized item.
+    is_grounded, text = groundedness.check(
+        _judge, outputs["answer"], [json.dumps(reference_outputs["context"])]
     )
-    text = verdict.content.strip().upper()
-    last_line = text.splitlines()[-1] if text.splitlines() else text
-    score = 0 if "NOT_GROUNDED" in last_line else 1
-    return {"key": "grounded", "score": score, "comment": verdict.content.strip()[:500]}
+    return {"key": "grounded", "score": 1 if is_grounded else 0, "comment": text.strip()[:500]}
 
 
 def main() -> None:
