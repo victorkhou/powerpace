@@ -1,38 +1,20 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { useAppStore } from '@/store/app-store'
+import { useState } from 'react'
+import { useActiveProgram } from '@/hooks/use-active-program'
 import { INCREMENTS, LIFT_LABELS, formatVolumePct } from '@/lib/progression'
 import type { WorkingWeight } from '@/types/database'
 import { PlateCalculatorSheet } from '@/components/today/plate-calculator-sheet'
-import { activeProgramQuery } from '@/lib/date'
 
 const LINEAR_ORDER = ['squat', 'bench', 'incline', 'ohp', 'deadlift', 'row', 'cgbp', 'rdl', 'goodMornings']
 const AUTO_ORDER = ['squatVol', 'benchVol', 'inclineVol', 'ohpVol', 'rowVol']
 
 export default function WeightsPage() {
-  const { activeProgram, setActiveProgram } = useAppStore()
+  const { program, weights, loading, refresh } = useActiveProgram()
   const [editing, setEditing] = useState(false)
   const [editValues, setEditValues] = useState<Record<string, number>>({})
   const [saving, setSaving] = useState<string | null>(null)
-  const [loading, setLoading] = useState(!activeProgram)
   const [plateOpenKey, setPlateOpenKey] = useState<string | null>(null)
-
-  const program = activeProgram?.program
-  const weights = activeProgram?.weights ?? {}
-
-  useEffect(() => {
-    if (activeProgram) { setLoading(false); return }
-    async function load() {
-      const res = await fetch(`/api/programs/active${activeProgramQuery()}`)
-      if (res.ok) {
-        const data = await res.json()
-        setActiveProgram(data)
-      }
-      setLoading(false)
-    }
-    load()
-  }, [activeProgram, setActiveProgram])
 
   function startEditing() {
     const vals: Record<string, number> = {}
@@ -57,8 +39,7 @@ export default function WeightsPage() {
         alert(`Save failed: ${err.error ?? res.statusText}`)
         return
       }
-      const refresh = await fetch(`/api/programs/active${activeProgramQuery()}`)
-      if (refresh.ok) setActiveProgram(await refresh.json())
+      await refresh()
     } catch (e) {
       alert(`Save failed: ${e instanceof Error ? e.message : 'network error'}`)
     } finally {

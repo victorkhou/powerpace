@@ -1,10 +1,9 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { useAppStore } from '@/store/app-store'
+import { useActiveProgram } from '@/hooks/use-active-program'
 import type { WorkoutDay, Exercise } from '@/types/database'
 import { WeekSwap } from '@/components/schedule/week-swap'
-import { activeProgramQuery } from '@/lib/date'
 import { formatVolumePct } from '@/lib/progression'
 
 const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
@@ -19,14 +18,11 @@ const TYPE_COLOR: Record<string, string> = {
 type DayWithExercises = WorkoutDay & { exercises: Exercise[] }
 
 export default function SchedulePage() {
-  const { activeProgram, setActiveProgram } = useAppStore()
+  const { program, weights, refresh } = useActiveProgram()
   const [viewWeek, setViewWeek] = useState<'A' | 'B'>('A')
   const [expandedDay, setExpandedDay] = useState<string | null>(null)
   const [days, setDays] = useState<DayWithExercises[]>([])
   const [loading, setLoading] = useState(true)
-
-  const program = activeProgram?.program
-  const weights = activeProgram?.weights ?? {}
   const todayDow = new Date().getDay()
 
   useEffect(() => {
@@ -49,9 +45,8 @@ export default function SchedulePage() {
   // After a swap, refresh the cached active program so the Today page reflects
   // the new resolved workout for the current date.
   const handleSwapChanged = useCallback(async () => {
-    const res = await fetch(`/api/programs/active${activeProgramQuery()}`)
-    if (res.ok) setActiveProgram(await res.json())
-  }, [setActiveProgram])
+    await refresh()
+  }, [refresh])
 
   if (loading) {
     return (

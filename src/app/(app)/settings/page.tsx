@@ -5,30 +5,18 @@ import { useAppStore } from '@/store/app-store'
 import { useSessionStore } from '@/store/session-store'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { activeProgramQuery } from '@/lib/date'
+import { useActiveProgram } from '@/hooks/use-active-program'
 import { TemplatesSection } from '@/components/settings/templates-section'
 
 export default function SettingsPage() {
-  const { activeProgram, setActiveProgram, clearProgram } = useAppStore()
+  const { program, loading, refresh } = useActiveProgram()
+  const clearProgram = useAppStore((s) => s.clearProgram)
   const resetSession = useSessionStore((s) => s.reset)
   const router = useRouter()
   const [weekInput, setWeekInput] = useState('')
   const [deloadInput, setDeloadInput] = useState('')
   const [volumeInput, setVolumeInput] = useState('')
   const [saving, setSaving] = useState(false)
-  const [loading, setLoading] = useState(!activeProgram)
-
-  const program = activeProgram?.program
-
-  useEffect(() => {
-    if (activeProgram) { setLoading(false); return }
-    async function load() {
-      const res = await fetch(`/api/programs/active${activeProgramQuery()}`)
-      if (res.ok) setActiveProgram(await res.json())
-      setLoading(false)
-    }
-    load()
-  }, [activeProgram, setActiveProgram])
 
   useEffect(() => {
     if (program) {
@@ -49,8 +37,7 @@ export default function SettingsPage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ programId: program.id, weekNumber: val }),
     })
-    const res = await fetch(`/api/programs/active${activeProgramQuery()}`)
-    if (res.ok) setActiveProgram(await res.json())
+    await refresh()
     setSaving(false)
   }
 
@@ -65,8 +52,7 @@ export default function SettingsPage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ programId: program.id, deloadWeek }),
     })
-    const res = await fetch(`/api/programs/active${activeProgramQuery()}`)
-    if (res.ok) setActiveProgram(await res.json())
+    await refresh()
     setSaving(false)
   }
 
@@ -80,8 +66,7 @@ export default function SettingsPage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ programId: program.id, volumePct: pct / 100 }),
     })
-    const res = await fetch(`/api/programs/active${activeProgramQuery()}`)
-    if (res.ok) setActiveProgram(await res.json())
+    await refresh()
     setSaving(false)
   }
 
@@ -96,8 +81,7 @@ export default function SettingsPage() {
     })
     // Today's workout will change — clear any in-progress set state
     resetSession()
-    const res = await fetch(`/api/programs/active${activeProgramQuery()}`)
-    if (res.ok) setActiveProgram(await res.json())
+    await refresh()
     setSaving(false)
   }
 

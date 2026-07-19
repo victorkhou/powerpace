@@ -16,8 +16,11 @@ export type { Program }
 
 type AppState = {
   activeProgram: ActiveProgram | null
-  setActiveProgram: (data: ActiveProgram | null) => void
-  updateWeight: (key: string, weight: WorkingWeight) => void
+  // The local date key the payload was fetched for. todayWorkout/todaySession
+  // are date-bound, so a persisted blob from yesterday must be refetched —
+  // useActiveProgram() uses this as its staleness signal.
+  loadedDate: string | null
+  setActiveProgram: (data: ActiveProgram | null, dateKey?: string | null) => void
   clearProgram: () => void
 }
 
@@ -25,25 +28,14 @@ export const useAppStore = create<AppState>()(
   persist(
     (set) => ({
       activeProgram: null,
+      loadedDate: null,
 
-      setActiveProgram(data) {
-        set({ activeProgram: data })
-      },
-
-      updateWeight(key, weight) {
-        set((s) => {
-          if (!s.activeProgram) return s
-          return {
-            activeProgram: {
-              ...s.activeProgram,
-              weights: { ...s.activeProgram.weights, [key]: weight },
-            },
-          }
-        })
+      setActiveProgram(data, dateKey = null) {
+        set({ activeProgram: data, loadedDate: dateKey })
       },
 
       clearProgram() {
-        set({ activeProgram: null })
+        set({ activeProgram: null, loadedDate: null })
       },
     }),
     {

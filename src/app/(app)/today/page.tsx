@@ -1,8 +1,7 @@
 'use client'
 
-import { useEffect, useState, useCallback, useRef } from 'react'
-import { useRouter } from 'next/navigation'
-import { useAppStore } from '@/store/app-store'
+import { useEffect, useState, useRef } from 'react'
+import { useActiveProgram } from '@/hooks/use-active-program'
 import { useSessionStore } from '@/store/session-store'
 import { useTimerStore } from '@/store/timer-store'
 import { ExerciseCard } from '@/components/today/exercise-card'
@@ -12,16 +11,12 @@ import { PartialConfirmModal } from '@/components/today/partial-confirm-modal'
 import { RpePicker } from '@/components/today/rpe-picker'
 import { Textarea } from '@/components/ui/textarea'
 import type { ChangeEntry } from '@/app/api/sessions/log/route'
-import type { ActiveProgram } from '@/store/app-store'
-import { localDateKey } from '@/lib/date'
 import { optimisticMutate } from '@/lib/optimistic'
 import { formatVolumePct, sessionVolume } from '@/lib/progression'
 
 export default function TodayPage() {
-  const router = useRouter()
-  const { activeProgram, setActiveProgram } = useAppStore()
+  const { activeProgram, loadedDate, loading, refresh } = useActiveProgram()
   const { sets, paceInputs, notes, setNotes, sessionLogged, sessionId, markLogged, clearLogged, reset, resetIfStale } = useSessionStore()
-  const [loading, setLoading] = useState(true)
   const [logging, setLogging] = useState(false)
   const [skipping, setSkipping] = useState(false)
   const [undoing, setUndoing] = useState(false)
@@ -31,41 +26,26 @@ export default function TodayPage() {
   const [error, setError] = useState<string | null>(null)
   const [rpe, setRpe] = useState<number | null>(null)
   const [rpeError, setRpeError] = useState<string | null>(null)
-  const [loadedDate, setLoadedDate] = useState<string | null>(null)
   const rpeReqIdRef = useRef(0)
   const mountedRef = useRef(true)
 
-  const loadProgram = useCallback(async () => {
-    setLoading(true)
-    try {
-      const now = new Date()
-      const dow = now.getDay()
-      const date = localDateKey(now)
-      const res = await fetch(`/api/programs/active?dow=${dow}&date=${date}`)
-      if (res.status === 401) { router.push('/login'); return }
-      const data: ActiveProgram = await res.json()
-      setActiveProgram(data)
-      setLoadedDate(date)
-      // Reset persisted set state if it's bound to a different day or workout
-      if (data.todayWorkout) {
-        resetIfStale(date, data.todayWorkout.id)
-      }
-      // Sync sessionLogged flag with server truth
-      if (data.todaySession && data.todaySession.status !== 'undone' && data.todaySession.status !== 'skipped') {
-        markLogged(data.todaySession.id)
-        setRpe(data.todaySession.rpe ?? null)
-      } else {
-        clearLogged()
-        setRpe(null)
-      }
-    } finally {
-      setLoading(false)
-    }
-  }, [router, setActiveProgram, markLogged, clearLogged, resetIfStale])
-
+  // Sync session-store state from the (hook-owned) activeProgram payload:
+  // reset persisted set state when the day/workout changed, and mirror the
+  // server's session status into sessionLogged/rpe.
   useEffect(() => {
-    loadProgram()
-  }, [loadProgram])
+    if (!activeProgram || !loadedDate) return
+    if (activeProgram.todayWorkout) {
+      resetIfStale(loadedDate, activeProgram.todayWorkout.id)
+    }
+    const s = activeProgram.todaySession
+    if (s && s.status !== 'undone' && s.status !== 'skipped') {
+      markLogged(s.id)
+      setRpe(s.rpe ?? null)
+    } else {
+      clearLogged()
+      setRpe(null)
+    }
+  }, [activeProgram, loadedDate, resetIfStale, markLogged, clearLogged])
 
   useEffect(() => {
     return () => { mountedRef.current = false }
@@ -172,6 +152,9 @@ export default function TodayPage() {
       useTimerStore.getState().stop()
       setChanges(data.changes)
       setShowSummary(true)
+      // Refresh the cached activeProgram so todaySession reflects the log —
+      // otherwise a remount would sync sessionLogged from the stale cache.
+      refresh()
     } finally {
       setLogging(false)
     }
@@ -207,7 +190,7 @@ export default function TodayPage() {
     setSkipping(false)
     useTimerStore.getState().stop()
     reset()
-    loadProgram()
+    refresh()
   }
 
   async function handleUndo() {
@@ -224,7 +207,7 @@ export default function TodayPage() {
       setRpe(null)
       rpeReqIdRef.current++
       reset()
-      loadProgram()
+      refresh()
     }
   }
 
