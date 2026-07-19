@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/api-auth'
+import { requireWorkoutDay } from '@/lib/ownership'
 import type { Database } from '@/types/database'
 
 type WorkoutDayUpdate = Database['public']['Tables']['workout_days']['Update']
@@ -12,7 +13,7 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { user, db, error: authError } = await getAuthenticatedUser()
-  if (authError || !user) return authError!
+  if (authError || !user || !db) return authError!
 
   const { id } = await params
   const body: {
@@ -66,15 +67,8 @@ export async function PATCH(
     return NextResponse.json({ error: 'no fields to update' }, { status: 400 })
   }
 
-  const { data: day } = await db
-    .from('workout_days')
-    .select('id, programs!inner(user_id)')
-    .eq('id', id)
-    .single()
-
-  if (!day) return NextResponse.json({ error: 'Workout day not found' }, { status: 404 })
-  const prog = day.programs as { user_id: string }
-  if (prog.user_id !== user.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+  const owned = await requireWorkoutDay(db, user, id)
+  if ('error' in owned) return owned.error
 
   const { error: updateError } = await db
     .from('workout_days')

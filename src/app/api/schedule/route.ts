@@ -1,18 +1,15 @@
 import { NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/api-auth'
+import { getActiveProgram } from '@/lib/ownership'
 import type { WorkoutDay, Exercise } from '@/types/database'
 
 export async function GET() {
   const { user, supabase, error: authError } = await getAuthenticatedUser()
   if (authError || !user || !supabase) return authError!
 
-  const { data: program } = await supabase
-    .from('programs')
-    .select('id')
-    .eq('user_id', user.id)
-    .eq('is_active', true)
-    .single<{ id: string }>()
-
+  const res = await getActiveProgram(supabase, user)
+  if ('error' in res) return res.error
+  const { program } = res
   if (!program) return NextResponse.json({ days: [] })
 
   const { data: daysRaw } = await supabase

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/api-auth'
-import { recompute, AUTO_KEYS, PROGRESSABLE } from '@/lib/progression'
+import { diffAutoWeights, AUTO_KEYS, PROGRESSABLE } from '@/lib/progression'
 import { requireProgram } from '@/lib/ownership'
 import type { WorkingWeight } from '@/types/database'
 
@@ -48,27 +48,28 @@ export async function PATCH(
     failures_at_change: 0,
   })
 
-  // If the edited key is an intensity parent of any auto-derived volume keys, recompute
+  // If the edited key is an intensity parent of any auto-derived volume keys,
+  // recompute. A failed read here is a 500 (previously it silently coalesced to
+  // [] and skipped recomputation while still returning ok:true).
   if (PROGRESSABLE.has(key)) {
-    const { data: allWeightsRaw } = await supabase
+    const { data: allWeightsRaw, error: readError } = await supabase
       .from('working_weights')
       .select('*')
       .eq('program_id', programId)
-    const allWeights = (allWeightsRaw ?? []) as WorkingWeight[]
-    const map = Object.fromEntries(allWeights.map((w) => [w.key, w.weight_lbs]))
-    map[key] = weightLbs
-    const recomputed = recompute(map, program.volume_pct)
-    for (const ak of AUTO_KEYS) {
-      const newVal = recomputed[ak]
-      const existing = allWeights.find((w) => w.key === ak)
-      if (existing && newVal !== undefined && newVal !== existing.weight_lbs) {
-        await db
-          .from('working_weights')
-          .update({ weight_lbs: newVal, updated_at: new Date().toISOString() })
+    if (readError) return NextResponse.json({ error: 'Failed to load weights' }, { status: 500 })
+
+    const changed = diffAutoWeights((allWeightsRaw ?? []) as WorkingWeight[], program.volume_pct, { [key]: weightLbs })
+    const now = new Date().toISOString()
+    const results = await Promise.all(
+      changed.map((c) =>
+        db.from('working_weights')
+          .update({ weight_lbs: c.weight_lbs, updated_at: now })
           .eq('program_id', programId)
-          .eq('key', ak)
-      }
-    }
+          .eq('key', c.key)
+      )
+    )
+    const failed = results.find((r) => r.error)
+    if (failed?.error) return NextResponse.json({ error: failed.error.message }, { status: 500 })
   }
 
   return NextResponse.json({ ok: true })

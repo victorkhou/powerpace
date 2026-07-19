@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/api-auth'
+import { requireProgram } from '@/lib/ownership'
 import type { Database } from '@/types/database'
 
 type ProgramUpdate = Database['public']['Tables']['programs']['Update']
@@ -17,14 +18,8 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ error: 'weekNumber must be a positive integer' }, { status: 400 })
   }
 
-  const { data: program } = await supabase
-    .from('programs')
-    .select('id')
-    .eq('id', programId)
-    .eq('user_id', user.id)
-    .single<{ id: string }>()
-
-  if (!program) return NextResponse.json({ error: 'Program not found' }, { status: 404 })
+  const owned = await requireProgram(supabase, user, programId)
+  if ('error' in owned) return owned.error
 
   const updates: ProgramUpdate = {}
   if (weekNumber !== undefined) updates.week_number = weekNumber

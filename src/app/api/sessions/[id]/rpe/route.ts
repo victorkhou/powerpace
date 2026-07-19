@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/api-auth'
+import { requireSession } from '@/lib/ownership'
 
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { user, db, error: authError } = await getAuthenticatedUser()
-  if (authError || !user) return authError!
+  if (authError || !user || !db) return authError!
 
   const { id } = await params
   const body: { rpe?: number | null } = await request.json()
@@ -16,16 +17,9 @@ export async function PATCH(
     return NextResponse.json({ error: 'rpe must be null or an integer 1-10' }, { status: 400 })
   }
 
-  const { data: session } = await db
-    .from('sessions')
-    .select('id, status, programs!inner(user_id)')
-    .eq('id', id)
-    .single()
-
-  if (!session) return NextResponse.json({ error: 'Session not found' }, { status: 404 })
-  const prog = session.programs as { user_id: string }
-  if (prog.user_id !== user.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
-  if (session.status !== 'completed' && session.status !== 'partial') {
+  const owned = await requireSession(db, user, id)
+  if ('error' in owned) return owned.error
+  if (owned.session.status !== 'completed' && owned.session.status !== 'partial') {
     return NextResponse.json({ error: 'Session not editable' }, { status: 409 })
   }
 

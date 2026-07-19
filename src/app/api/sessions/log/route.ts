@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/api-auth'
-import { processLift, recompute, sessionVolume, nextFridayAlt, PROGRESSABLE, AUTO_KEYS } from '@/lib/progression'
-import { isFriday } from '@/lib/date'
+import { processLift, diffAutoWeights, sessionVolume, nextFridayAlt, PROGRESSABLE } from '@/lib/progression'
+import { isDateKey, isFriday } from '@/lib/date'
 import { requireProgram } from '@/lib/ownership'
 import type { WorkingWeight } from '@/types/database'
 
@@ -50,7 +50,7 @@ function validateLogBody(raw: unknown): { body: LogSessionRequest } | { error: s
   const b = raw as Record<string, unknown>
   if (typeof b.programId !== 'string' || !b.programId) return { error: 'programId required' }
   if (typeof b.workoutDayId !== 'string' || !b.workoutDayId) return { error: 'workoutDayId required' }
-  if (typeof b.date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(b.date)) return { error: 'invalid date' }
+  if (!isDateKey(b.date)) return { error: 'invalid date' }
   if (b.weekType !== 'A' && b.weekType !== 'B') return { error: 'invalid weekType' }
   if (!Number.isInteger(b.weekNumber) || (b.weekNumber as number) < 1) return { error: 'invalid weekNumber' }
   if (b.fridayAlt !== null && b.fridayAlt !== 'A1' && b.fridayAlt !== 'A2') return { error: 'invalid fridayAlt' }
@@ -185,19 +185,18 @@ export async function POST(request: NextRequest) {
   }
 
   // Recompute auto-derived volume weights (only push genuine changes).
-  const recomputed = recompute(updatedWeights, program.volume_pct)
-  for (const key of AUTO_KEYS) {
-    const newVal = recomputed[key]
-    const ww = weightsMap[key]
-    if (ww && newVal !== undefined && newVal !== ww.weight_lbs) {
-      weightUpdates.push({
-        key,
-        weight_lbs: newVal,
-        failures: ww.failures,
-        streak: ww.streak,
-        pr_lbs: ww.pr_lbs ?? ww.weight_lbs,
-      })
-    }
+  // updatedWeights carries the post-progression values as overrides on top of
+  // the pre-session rows, so the diff reflects where lifts just moved to.
+  for (const c of diffAutoWeights(weightsArr, program.volume_pct, updatedWeights)) {
+    const ww = weightsMap[c.key]
+    if (!ww) continue
+    weightUpdates.push({
+      key: c.key,
+      weight_lbs: c.weight_lbs,
+      failures: ww.failures,
+      streak: ww.streak,
+      pr_lbs: ww.pr_lbs ?? ww.weight_lbs,
+    })
   }
 
   // friday_alt is 'A1' | 'A2' by DB check constraint; the generated row type

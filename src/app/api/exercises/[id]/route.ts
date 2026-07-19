@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/api-auth'
+import { requireExercise } from '@/lib/ownership'
 import { validateExercise, validateExerciseFull, type ExerciseShape } from '@/lib/exercise-validation'
 
 const ALLOWED_FIELDS: Array<keyof ExerciseShape> = [
@@ -15,30 +16,12 @@ const ALLOWED_FIELDS: Array<keyof ExerciseShape> = [
   'sort_order',
 ]
 
-async function loadExerciseWithOwner(
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  db: any,
-  id: string
-): Promise<{ row: ExerciseShape & { id: string; workout_day_id: string }; ownerId: string } | null> {
-  const { data } = await db
-    .from('exercises')
-    .select('*, workout_days!inner(programs!inner(user_id))')
-    .eq('id', id)
-    .single()
-  if (!data) return null
-  const ownerId = data.workout_days?.programs?.user_id as string | undefined
-  if (!ownerId) return null
-  const { workout_days, ...rest } = data
-  void workout_days
-  return { row: rest, ownerId }
-}
-
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { user, db, error: authError } = await getAuthenticatedUser()
-  if (authError || !user) return authError!
+  if (authError || !user || !db) return authError!
 
   const { id } = await params
   const body: Partial<ExerciseShape> = await request.json()
@@ -54,11 +37,10 @@ export async function PATCH(
   const partial = validateExercise(update)
   if (partial) return NextResponse.json({ error: partial }, { status: 400 })
 
-  const loaded = await loadExerciseWithOwner(db, id)
-  if (!loaded) return NextResponse.json({ error: 'Exercise not found' }, { status: 404 })
-  if (loaded.ownerId !== user.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+  const owned = await requireExercise(db, user, id)
+  if ('error' in owned) return owned.error
 
-  const merged: ExerciseShape = { ...loaded.row, ...update }
+  const merged = { ...(owned.exercise as unknown as ExerciseShape), ...update }
   const fullErr = validateExerciseFull(merged)
   if (fullErr) return NextResponse.json({ error: fullErr }, { status: 400 })
 
@@ -76,13 +58,12 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { user, db, error: authError } = await getAuthenticatedUser()
-  if (authError || !user) return authError!
+  if (authError || !user || !db) return authError!
 
   const { id } = await params
 
-  const loaded = await loadExerciseWithOwner(db, id)
-  if (!loaded) return NextResponse.json({ error: 'Exercise not found' }, { status: 404 })
-  if (loaded.ownerId !== user.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+  const owned = await requireExercise(db, user, id)
+  if ('error' in owned) return owned.error
 
   const { error: deleteError } = await db.from('exercises').delete().eq('id', id)
   if (deleteError) return NextResponse.json({ error: deleteError.message }, { status: 500 })

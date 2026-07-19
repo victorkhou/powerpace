@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/api-auth'
 import { requireProgram } from '@/lib/ownership'
-import { recompute, AUTO_KEYS } from '@/lib/progression'
+import { diffAutoWeights } from '@/lib/progression'
 import type { Database, WorkingWeight } from '@/types/database'
 
 type ProgramUpdate = Database['public']['Tables']['programs']['Update']
@@ -45,20 +45,18 @@ export async function PATCH(request: NextRequest) {
       .eq('program_id', programId)
     if (readError) return NextResponse.json({ error: 'Failed to load weights' }, { status: 500 })
 
-    const allWeights = (allWeightsRaw ?? []) as WorkingWeight[]
-    const map = Object.fromEntries(allWeights.map((w) => [w.key, w.weight_lbs]))
-    const recomputed = recompute(map, volumePct)
-    for (const ak of AUTO_KEYS) {
-      const newVal = recomputed[ak]
-      const existing = allWeights.find((w) => w.key === ak)
-      if (existing && newVal !== undefined && newVal !== existing.weight_lbs) {
-        await db
-          .from('working_weights')
-          .update({ weight_lbs: newVal, updated_at: new Date().toISOString() })
+    const changed = diffAutoWeights((allWeightsRaw ?? []) as WorkingWeight[], volumePct)
+    const now = new Date().toISOString()
+    const results = await Promise.all(
+      changed.map((c) =>
+        db.from('working_weights')
+          .update({ weight_lbs: c.weight_lbs, updated_at: now })
           .eq('program_id', programId)
-          .eq('key', ak)
-      }
-    }
+          .eq('key', c.key)
+      )
+    )
+    const failed = results.find((r) => r.error)
+    if (failed?.error) return NextResponse.json({ error: failed.error.message }, { status: 500 })
   }
 
   return NextResponse.json({ ok: true })

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/api-auth'
+import { requireActiveProgram } from '@/lib/ownership'
 import type { WorkoutDay, Exercise } from '@/types/database'
 
 export type ProgramTemplate = {
@@ -11,14 +12,9 @@ export async function GET() {
   const { user, supabase, error: authError } = await getAuthenticatedUser()
   if (authError || !user || !supabase) return authError!
 
-  const { data: program } = await supabase
-    .from('programs')
-    .select('id')
-    .eq('user_id', user.id)
-    .eq('is_active', true)
-    .single()
-
-  if (!program) return NextResponse.json({ error: 'No active program' }, { status: 404 })
+  const res = await requireActiveProgram(supabase, user)
+  if ('error' in res) return res.error
+  const { program } = res
 
   const { data: days } = await supabase
     .from('workout_days')

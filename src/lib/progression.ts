@@ -56,6 +56,34 @@ export function autoVolumeFor(parentKey: string, parentWeight: number, volumePct
 }
 
 /**
+ * Diffs the auto-derived volume weights against a recompute. THE single
+ * definition of the recompute-and-diff step that three routes previously
+ * copy-pasted (sessions/log, programs/settings, weights/[key]) — and which had
+ * already diverged in error handling. Pure: takes the current weights, an
+ * optional key override (weights/[key] applies the just-edited value before
+ * recomputing), and returns only the AUTO_KEYS rows whose value genuinely
+ * changed. Callers decide how to persist (RPC payload vs. direct update).
+ */
+export function diffAutoWeights(
+  weights: Array<{ key: string; weight_lbs: number }>,
+  volumePct: number,
+  overrides?: Record<string, number>
+): Array<{ key: string; weight_lbs: number }> {
+  const map: Record<string, number> = Object.fromEntries(weights.map((w) => [w.key, w.weight_lbs]))
+  if (overrides) Object.assign(map, overrides)
+  const recomputed = recompute(map, volumePct)
+  const out: Array<{ key: string; weight_lbs: number }> = []
+  for (const key of AUTO_KEYS) {
+    const newVal = recomputed[key]
+    const existing = weights.find((w) => w.key === key)
+    if (existing && newVal !== undefined && newVal !== existing.weight_lbs) {
+      out.push({ key, weight_lbs: newVal })
+    }
+  }
+  return out
+}
+
+/**
  * Session volume from per-set entries. THE single definition of the volume
  * rule: completed sets only, must have a weight and a weight_key, and
  * auto-derived volume keys are EXCLUDED so volume-day work isn't

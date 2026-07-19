@@ -1,3 +1,8 @@
+/** Validates a YYYY-MM-DD date key. One definition instead of four inline regexes. */
+export function isDateKey(s: unknown): s is string {
+  return typeof s === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s)
+}
+
 export function localDateKey(d: Date = new Date()): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }

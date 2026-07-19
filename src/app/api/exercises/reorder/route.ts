@@ -1,24 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/api-auth'
+import { requireWorkoutDay } from '@/lib/ownership'
 
 export async function POST(request: NextRequest) {
   const { user, db, error: authError } = await getAuthenticatedUser()
-  if (authError || !user) return authError!
+  if (authError || !user || !db) return authError!
 
   const body: { workoutDayId: string; orderedIds: string[] } = await request.json()
   if (!body.workoutDayId || !Array.isArray(body.orderedIds)) {
     return NextResponse.json({ error: 'workoutDayId and orderedIds[] are required' }, { status: 400 })
   }
 
-  const { data: day } = await db
-    .from('workout_days')
-    .select('id, programs!inner(user_id)')
-    .eq('id', body.workoutDayId)
-    .single()
-
-  if (!day) return NextResponse.json({ error: 'Workout day not found' }, { status: 404 })
-  const prog = day.programs as { user_id: string }
-  if (prog.user_id !== user.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+  const owned = await requireWorkoutDay(db, user, body.workoutDayId)
+  if ('error' in owned) return owned.error
 
   const { data: existing } = await db
     .from('exercises')

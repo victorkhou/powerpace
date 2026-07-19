@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/api-auth'
+import { requireActiveProgram } from '@/lib/ownership'
 import { matchNaturalWorkout } from '@/lib/resolve-workout'
-import { localDateKey, startOfWeekKey, weekWindowKeys } from '@/lib/date'
-import type { Program, WorkoutDay } from '@/types/database'
+import { isDateKey, localDateKey, startOfWeekKey, weekWindowKeys } from '@/lib/date'
+import type { WorkoutDay } from '@/types/database'
 
 // GET /api/schedule/overrides?start=YYYY-MM-DD&days=7
 // Returns each calendar date in the window with its resolved workout_day_id,
@@ -16,19 +17,13 @@ export async function GET(request: NextRequest) {
   const daysParam = parseInt(url.searchParams.get('days') ?? '7', 10)
   const windowLen = Number.isInteger(daysParam) && daysParam > 0 && daysParam <= 28 ? daysParam : 7
 
-  if (!startParam || !/^\d{4}-\d{2}-\d{2}$/.test(startParam)) {
+  if (!isDateKey(startParam)) {
     return NextResponse.json({ error: 'start (YYYY-MM-DD) is required' }, { status: 400 })
   }
 
-  const { data: programRaw } = await supabase
-    .from('programs')
-    .select('*')
-    .eq('user_id', user.id)
-    .eq('is_active', true)
-    .single()
-
-  const program = programRaw as Program | null
-  if (!program) return NextResponse.json({ error: 'No active program' }, { status: 404 })
+  const res = await requireActiveProgram(supabase, user)
+  if ('error' in res) return res.error
+  const { program } = res
 
   const { data: daysRaw } = await supabase
     .from('workout_days')
@@ -107,8 +102,7 @@ export async function POST(request: NextRequest) {
 
   const body: { dateA?: string; dateB?: string } = await request.json()
   const { dateA, dateB } = body
-  const dateRe = /^\d{4}-\d{2}-\d{2}$/
-  if (!dateA || !dateB || !dateRe.test(dateA) || !dateRe.test(dateB)) {
+  if (!isDateKey(dateA) || !isDateKey(dateB)) {
     return NextResponse.json({ error: 'dateA and dateB (YYYY-MM-DD) are required' }, { status: 400 })
   }
   if (dateA === dateB) {
@@ -122,14 +116,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Can only swap days within the current week' }, { status: 400 })
   }
 
-  const { data: programRaw } = await supabase
-    .from('programs')
-    .select('*')
-    .eq('user_id', user.id)
-    .eq('is_active', true)
-    .single()
-  const program = programRaw as Program | null
-  if (!program) return NextResponse.json({ error: 'No active program' }, { status: 404 })
+  const res = await requireActiveProgram(supabase, user)
+  if ('error' in res) return res.error
+  const { program } = res
 
   // Block swapping a date that already has a real (logged) session.
   const { data: lockedSessions } = await supabase
@@ -210,18 +199,13 @@ export async function DELETE(request: NextRequest) {
 
   const url = new URL(request.url)
   const date = url.searchParams.get('date')
-  if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+  if (!isDateKey(date)) {
     return NextResponse.json({ error: 'date (YYYY-MM-DD) is required' }, { status: 400 })
   }
 
-  const { data: programRaw } = await supabase
-    .from('programs')
-    .select('id')
-    .eq('user_id', user.id)
-    .eq('is_active', true)
-    .single()
-  const program = programRaw as { id: string } | null
-  if (!program) return NextResponse.json({ error: 'No active program' }, { status: 404 })
+  const res = await requireActiveProgram(supabase, user)
+  if ('error' in res) return res.error
+  const { program } = res
 
   // A date with a logged session is locked to the workout that was performed —
   // clearing its override would detach the displayed plan from logged history.
