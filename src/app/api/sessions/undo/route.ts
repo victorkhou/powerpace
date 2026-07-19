@@ -1,17 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/api-auth'
-import { isFriday } from '@/lib/date'
 
 export async function POST(request: NextRequest) {
   const { user, supabase, db, error: authError } = await getAuthenticatedUser()
   if (authError || !user || !supabase) return authError!
 
   const { sessionId } = await request.json()
+  if (typeof sessionId !== 'string' || !sessionId) {
+    return NextResponse.json({ error: 'sessionId required' }, { status: 400 })
+  }
 
   // Fetch the session and verify ownership via join
   const { data: session } = await db
     .from('sessions')
-    .select('*, programs!inner(user_id, id)')
+    .select('id, programs!inner(user_id, id)')
     .eq('id', sessionId)
     .single()
 
@@ -34,39 +36,15 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Only the most recent session can be undone' }, { status: 400 })
   }
 
-  // Restore working_weights from snapshot
-  const snapshot = session.weight_snapshot as Record<string, number> | null
-  if (snapshot) {
-    for (const [key, weight] of Object.entries(snapshot)) {
-      await db
-        .from('working_weights')
-        .update({ weight_lbs: weight, updated_at: new Date().toISOString() })
-        .eq('program_id', prog.id)
-        .eq('key', key)
-    }
-  }
-
-  // Delete session_sets, run_logs, weight_history for this session
-  await db.from('session_sets').delete().eq('session_id', sessionId)
-  await db.from('run_logs').delete().eq('session_id', sessionId)
-  await db.from('weight_history').delete().eq('session_id', sessionId)
-
-  // Mark session as undone (also clear rpe)
-  await db.from('sessions').update({ status: 'undone', rpe: null }).eq('id', sessionId)
-
-  // If this was a Friday Week A log, the log handler advanced friday_alt.
-  // Reverse it to restore the alternation. Tuesday Week A doesn't advance,
-  // so it doesn't need a reversal.
-  if (session.week_type === 'A' && isFriday(session.date as string)) {
-    const { data: progRow } = await supabase
-      .from('programs')
-      .select('friday_alt')
-      .eq('id', prog.id)
-      .single<{ friday_alt: 'A1' | 'A2' }>()
-    if (progRow) {
-      const reverted = progRow.friday_alt === 'A1' ? 'A2' : 'A1'
-      await db.from('programs').update({ friday_alt: reverted }).eq('id', prog.id)
-    }
+  // All writes (weight-snapshot restore, child-table deletes, status flip,
+  // friday_alt reversal) happen in one transaction — the mirror image of the
+  // log_session RPC, so a mid-sequence failure can't leave weights restored
+  // while the session still reads 'completed'.
+  const { error: rpcError } = await db.rpc('undo_session', {
+    payload: { sessionId },
+  })
+  if (rpcError) {
+    return NextResponse.json({ error: rpcError.message }, { status: 500 })
   }
 
   return NextResponse.json({ ok: true })

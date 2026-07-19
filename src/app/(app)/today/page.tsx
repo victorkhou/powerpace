@@ -15,7 +15,7 @@ import type { ChangeEntry } from '@/app/api/sessions/log/route'
 import type { ActiveProgram } from '@/store/app-store'
 import { localDateKey } from '@/lib/date'
 import { optimisticMutate } from '@/lib/optimistic'
-import { formatVolumePct } from '@/lib/progression'
+import { formatVolumePct, sessionVolume } from '@/lib/progression'
 
 export default function TodayPage() {
   const router = useRouter()
@@ -94,13 +94,18 @@ export default function TodayPage() {
   const completedSets = allExSets.filter((s) => s.completed).length
   const allComplete = totalSets > 0 && completedSets === totalSets
 
-  // Live volume
-  const liveVolume = exercises.reduce((acc, ex) => {
-    const w = ex.weight_key ? weights[ex.weight_key]?.weight_lbs ?? 0 : 0
-    const exState = sets[ex.id] ?? {}
-    const done = Object.values(exState).filter((s) => s.completed).length
-    return acc + done * ex.reps * w
-  }, 0)
+  // Live volume — same rule as the server (sessionVolume excludes auto-derived
+  // volume keys), so the header number always matches what logging will persist.
+  const liveVolume = sessionVolume(
+    exercises.flatMap((ex) =>
+      Object.values(sets[ex.id] ?? {}).map((s) => ({
+        weightKey: ex.weight_key,
+        weightLbs: ex.weight_key ? weights[ex.weight_key]?.weight_lbs ?? null : null,
+        reps: ex.reps,
+        completed: s.completed,
+      }))
+    )
+  )
 
   // Completion counter (exercises fully done / total exercises with sets)
   const exercisesDone = exercises.filter((ex) => {

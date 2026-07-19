@@ -581,6 +581,10 @@ export type Database = {
         Args: { payload: Json }
         Returns: Json
       }
+      undo_session: {
+        Args: { payload: Json }
+        Returns: Json
+      }
     }
     Enums: {
       [_ in never]: never

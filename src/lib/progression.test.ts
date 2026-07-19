@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { processLift, recompute, autoVolumeFor, formatVolumePct, INCREMENTS, AUTO_PARENT } from './progression'
+import { processLift, recompute, autoVolumeFor, formatVolumePct, sessionVolume, nextFridayAlt, INCREMENTS, AUTO_PARENT } from './progression'
 
 describe('processLift', () => {
   it('increments by the lift increment and bumps streak on a completed set', () => {
@@ -92,5 +92,39 @@ describe('formatVolumePct', () => {
     expect(formatVolumePct(0.875)).toBe('87.5%')
     expect(formatVolumePct(0.9)).toBe('90%')
     expect(formatVolumePct()).toBe('87.5%')
+  })
+})
+
+describe('sessionVolume', () => {
+  it('sums completed sets as weight × reps', () => {
+    const vol = sessionVolume([
+      { weightKey: 'squat', weightLbs: 280, reps: 5, completed: true },
+      { weightKey: 'squat', weightLbs: 280, reps: 5, completed: true },
+    ])
+    expect(vol).toBe(2800)
+  })
+
+  it('excludes incomplete sets, null weights, and null keys', () => {
+    const vol = sessionVolume([
+      { weightKey: 'bench', weightLbs: 157.5, reps: 5, completed: false }, // not done
+      { weightKey: 'bench', weightLbs: null, reps: 5, completed: true },   // no weight
+      { weightKey: null, weightLbs: 100, reps: 5, completed: true },        // no key (bodyweight)
+    ])
+    expect(vol).toBe(0)
+  })
+
+  it('excludes auto-derived volume keys (no double-counting) — the rule that drifted on the Today page', () => {
+    const vol = sessionVolume([
+      { weightKey: 'squat', weightLbs: 280, reps: 5, completed: true },
+      { weightKey: 'squatVol', weightLbs: 245, reps: 5, completed: true }, // auto key → excluded
+    ])
+    expect(vol).toBe(1400)
+  })
+})
+
+describe('nextFridayAlt', () => {
+  it('alternates A1 <-> A2', () => {
+    expect(nextFridayAlt('A1')).toBe('A2')
+    expect(nextFridayAlt('A2')).toBe('A1')
   })
 })

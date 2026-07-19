@@ -55,6 +55,30 @@ export function autoVolumeFor(parentKey: string, parentWeight: number, volumePct
   return Math.round((parentWeight * volumePct) / step) * step
 }
 
+/**
+ * Session volume from per-set entries. THE single definition of the volume
+ * rule: completed sets only, must have a weight and a weight_key, and
+ * auto-derived volume keys are EXCLUDED so volume-day work isn't
+ * double-counted against intensity. Used by both the log route (persisted
+ * volume_lbs) and the Today page (live header volume) so the number shown
+ * mid-workout always matches the number saved.
+ */
+export function sessionVolume(
+  entries: Array<{ weightKey: string | null; weightLbs: number | null; reps: number; completed: boolean }>
+): number {
+  return entries
+    .filter((e) => e.completed && e.weightLbs != null && e.weightKey != null && !AUTO_KEYS.has(e.weightKey))
+    .reduce((acc, e) => acc + e.weightLbs! * e.reps, 0)
+}
+
+/**
+ * The friday_alt flip. Lives here so the log route (advance), undo RPC docs,
+ * and any UI preview all share one rule instead of three inline ternaries.
+ */
+export function nextFridayAlt(current: 'A1' | 'A2'): 'A1' | 'A2' {
+  return current === 'A1' ? 'A2' : 'A1'
+}
+
 export type LiftResult =
   | { status: 'up'; weight: number; failures: number; streak: number; pr: number; from: number; to: number; isPR: boolean }
   | { status: 'down'; weight: number; failures: number; streak: number; pr: number; from: number; to: number; reason: string }

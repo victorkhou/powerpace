@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/api-auth'
-import { processLift, recompute, PROGRESSABLE, AUTO_KEYS } from '@/lib/progression'
+import { processLift, recompute, sessionVolume, nextFridayAlt, PROGRESSABLE, AUTO_KEYS } from '@/lib/progression'
 import { isFriday } from '@/lib/date'
 import { requireProgram } from '@/lib/ownership'
 import type { WorkingWeight } from '@/types/database'
@@ -109,10 +109,11 @@ export async function POST(request: NextRequest) {
     setsByExercise[s.exerciseId].push(s)
   }
 
-  // Volume excludes auto-derived (volume) keys to avoid double-counting against intensity.
-  const volume = sets
-    .filter((s) => s.completed && s.weightLbs != null && s.weightKey != null && !AUTO_KEYS.has(s.weightKey))
-    .reduce((acc, s) => acc + (s.weightLbs! * s.repsTarget), 0)
+  // Volume rule lives in progression.sessionVolume (shared with the Today
+  // page's live counter so displayed and persisted volume always agree).
+  const volume = sessionVolume(
+    sets.map((s) => ({ weightKey: s.weightKey, weightLbs: s.weightLbs, reps: s.repsTarget, completed: s.completed }))
+  )
 
   // ── Pure computation (tested engine) — no writes happen until the RPC ──
   const changes: ChangeEntry[] = []
@@ -199,8 +200,10 @@ export async function POST(request: NextRequest) {
     }
   }
 
+  // friday_alt is 'A1' | 'A2' by DB check constraint; the generated row type
+  // widens it to string, so narrow here (same treatment as week_type).
   const newFridayAlt =
-    isFriday(date) && weekType === 'A' ? (program.friday_alt === 'A1' ? 'A2' : 'A1') : null
+    isFriday(date) && weekType === 'A' ? nextFridayAlt(program.friday_alt as 'A1' | 'A2') : null
 
   // ── Single atomic write: session + sets + run logs + weight updates +
   // history + friday_alt flip all commit together, or none do. ──
