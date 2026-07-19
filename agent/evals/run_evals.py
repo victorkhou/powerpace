@@ -23,12 +23,10 @@ import json
 import os
 import uuid
 
-from langchain.chat_models import init_chat_model
 from langsmith import Client, evaluate
 
 from app import env  # noqa: F401 — load .env into os.environ before any SDK reads it
 from app import db, groundedness
-from app.config import settings
 from app.graph import ask
 
 # The user whose real data we evaluate against. Kept in .env (git-ignored) so the
@@ -47,11 +45,15 @@ def build_examples() -> list[dict]:
     """
     examples: list[dict] = []
 
+    # One progression-state fetch feeds both the factual and analysis examples
+    # (previously fetched twice; lift_labels adds its own internal queries).
+    state = db.get_progression_state(USER_ID)
+
     # Factual: one PR question per tracked lift that has a recorded PR.
     # `labels` is DB-derived; the intensity lifts are those whose key is NOT a
     # volume key (volume keys end in "Vol" and inherit their parent's name).
     labels = db.lift_labels(USER_ID)
-    for lift in db.get_progression_state(USER_ID):
+    for lift in state:
         if lift["key"] not in labels or lift["key"].endswith("Vol") or not lift.get("pr_lbs"):
             continue  # only the named main lifts; skip volume keys / unset PRs
         examples.append({
@@ -61,8 +63,6 @@ def build_examples() -> list[dict]:
         })
 
     # Analysis: open-ended questions graded by the LLM judge against context.
-    state = db.get_progression_state(USER_ID)
-    near_deload = [l for l in state if l["failures"] >= 1]
     examples.append({
         "inputs": {"question": "Which of my lifts are closest to a deload, and why?"},
         # Pass the FULL progression state, not just the filtered subset. The coach
@@ -133,7 +133,9 @@ def pr_correct(outputs: dict, reference_outputs: dict) -> bool:
 
 
 # ── 3b. LLM-as-judge evaluator (analysis examples) ──────────────────────────
-_judge = init_chat_model(settings.judge_model)  # claude-haiku-4-5 — cheap, runs often
+# Reuse the graph's lazy judge singleton — importing this module must not
+# construct a model (same hermeticity rule graph.py deliberately follows).
+from app.graph import _judge as _lazy_judge  # noqa: E402
 
 
 def grounded(inputs: dict, outputs: dict, reference_outputs: dict) -> dict:
@@ -153,7 +155,7 @@ def grounded(inputs: dict, outputs: dict, reference_outputs: dict) -> dict:
     # check() takes a list of "tool output" strings; the eval's ground-truth
     # context is the equivalent data, so pass it as a single serialized item.
     is_grounded, text = groundedness.check(
-        _judge, outputs["answer"], [json.dumps(reference_outputs["context"])]
+        _lazy_judge(), outputs["answer"], [json.dumps(reference_outputs["context"])]
     )
     return {"key": "grounded", "score": 1 if is_grounded else 0, "comment": text.strip()[:500]}
 

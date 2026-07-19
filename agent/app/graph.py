@@ -126,10 +126,14 @@ def build_coach(user_id: str, model_id: str | None = None):
         this is the structural backstop. The judge call adds latency only on final
         answers (once per turn), not on every tool hop."""
         answer = state["messages"][-1].content
-        # Gather the tool outputs produced this turn (since the last human turn).
+        # Gather the tool outputs produced this turn — walk back to the last REAL
+        # user message. Corrective messages injected by this node are tagged and
+        # skipped; stopping at them was a blind spot where a regenerated answer
+        # saw zero tool outputs and was accepted unverified (the retry answer is
+        # exactly the one that most needs checking).
         tool_outputs: list[str] = []
         for msg in reversed(state["messages"][:-1]):
-            if isinstance(msg, HumanMessage):
+            if isinstance(msg, HumanMessage) and not msg.additional_kwargs.get("coach_correction"):
                 break
             if isinstance(msg, ToolMessage):
                 tool_outputs.append(str(msg.content))
@@ -152,7 +156,10 @@ def build_coach(user_id: str, model_id: str | None = None):
             "Your previous answer included a figure or detail that is NOT in the "
             "tool results above. Re-answer using ONLY values present in those "
             "results. If a data point (e.g. a recent session) isn't there, do not "
-            "invent it — say it isn't recorded."
+            "invent it — say it isn't recorded.",
+            # Tag so verify_node's tool-output walk skips this message instead of
+            # treating it as the turn boundary (see comment above).
+            additional_kwargs={"coach_correction": True},
         )
         return {"messages": [correction], "grounding_attempts": attempts + 1}
 

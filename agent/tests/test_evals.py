@@ -39,11 +39,12 @@ def test_pr_correct_skips_non_factual_examples():
 
 # ── grounded: verdict PARSER (the LLM call is stubbed) ───────────────────────
 def _stub_judge(verdict_text):
-    """Replace the judge with a stub so grounded() exercises only its parsing
-    logic. _judge is a frozen Pydantic model (can't patch its .invoke), so we
-    swap the whole object for one whose invoke() returns a canned verdict."""
-    stub = SimpleNamespace(invoke=lambda _prompt: SimpleNamespace(content=verdict_text))
-    return patch.object(r, "_judge", stub)
+    """Stub the groundedness.check call so grounded() exercises only its parsing
+    + plumbing logic. We patch groundedness.check (which grounded() delegates to)
+    to return a canned (bool, text) tuple — the bool is the parsed verdict."""
+    from app import groundedness as g
+    is_grounded = g.parse_verdict(verdict_text)
+    return patch.object(g, "check", return_value=(is_grounded, verdict_text))
 
 
 def test_grounded_skips_when_no_context():

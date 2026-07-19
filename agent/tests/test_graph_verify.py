@@ -59,6 +59,44 @@ def test_verify_loop_regenerates_ungrounded_answer():
     assert "06-28" not in final.content        # the hallucinated answer was rejected
     assert "06-27" in final.content            # the corrected, grounded answer won
     assert result["grounding_attempts"] == 1   # exactly one regeneration
+    # Both verdicts consumed → the RETRY answer was re-verified too. Before the
+    # coach_correction tag fix, the retry pass saw zero tool outputs (the walk
+    # stopped at the correction message) and was accepted with NO judge call.
+    assert judge._verdicts == []
+
+
+def test_retry_answer_is_reverified_and_budget_bounds_the_loop():
+    """A retry that is STILL ungrounded must be re-judged (not silently accepted)
+    and then returned once the retry budget is exhausted — proving the verify
+    loop re-checks regenerated answers and remains bounded."""
+    tool_call = AIMessage(
+        content="", tool_calls=[{"name": "get_volume_trend", "args": {}, "id": "c1"}]
+    )
+    bad1 = AIMessage(content="You hit 9,999 lbs on 07-04.")
+    bad2 = AIMessage(content="Definitely 9,999 lbs on 07-04.")
+    model = _ScriptedModel([tool_call, bad1, bad2])
+
+    calls = {"n": 0}
+    def judge_invoke(_p):
+        calls["n"] += 1
+        return SimpleNamespace(content="nope\nNOT_GROUNDED")
+    judge = SimpleNamespace(invoke=judge_invoke)
+
+    with patch.object(g, "init_chat_model", return_value=model), \
+         patch.object(g, "_judge", return_value=judge), \
+         patch("app.db.get_volume_trend", return_value=[{"date": "2026-06-27", "volume_lbs": 0.0}]), \
+         patch("app.db.active_program_id", return_value="prog-1"):
+        agent = g.build_coach("user-1")
+        result = agent.invoke(
+            {"messages": [{"role": "user", "content": "volume?"}], "grounding_attempts": 0},
+            {"configurable": {"thread_id": "t3"}, "recursion_limit": 12},
+        )
+
+    # Judge ran on the original AND the retry (2 calls) — the retry was not
+    # silently accepted. With retries=1 exhausted, the last attempt is returned.
+    assert calls["n"] == 2
+    assert result["grounding_attempts"] == 1
+    assert isinstance(result["messages"][-1], AIMessage)
 
 
 def test_verify_accepts_grounded_answer_without_retry():
