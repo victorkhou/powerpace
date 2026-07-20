@@ -23,7 +23,6 @@ export function SetBox({ setNumber, completed, disabled, onToggle }: SetBoxProps
         backgroundColor: completed ? 'rgba(74,255,145,0.15)' : '#111',
         color: completed ? '#4aff91' : '#555',
         fontSize: '0.75rem',
-        fontFamily: "'DM Mono', monospace",
         fontWeight: 500,
         display: 'flex',
         alignItems: 'center',

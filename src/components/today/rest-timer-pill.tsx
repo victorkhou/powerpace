@@ -160,7 +160,6 @@ export function RestTimerPill() {
     >
       <span
         style={{
-          fontFamily: "'DM Mono', monospace",
           fontSize: '0.7rem',
           color: '#888',
           letterSpacing: '0.08em',

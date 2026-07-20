@@ -36,7 +36,6 @@ export function SessionSummaryModal({ open, changes, onUndo, onDone, undoing, se
           border: '1px solid #181818',
           color: '#d0d0d0',
           maxWidth: 400,
-          fontFamily: "'DM Mono', monospace",
         }}
         showCloseButton={false}
       >
@@ -126,7 +125,6 @@ export function SessionSummaryModal({ open, changes, onUndo, onDone, undoing, se
               backgroundColor: '#111',
               border: '1px solid #333',
               color: '#ff6b47',
-              fontFamily: "'DM Mono', monospace",
               fontSize: '0.75rem',
               height: 44,
             }}
@@ -139,7 +137,6 @@ export function SessionSummaryModal({ open, changes, onUndo, onDone, undoing, se
               flex: 2,
               backgroundColor: '#e8ff47',
               color: '#000',
-              fontFamily: "'DM Mono', monospace",
               fontSize: '0.8rem',
               fontWeight: 600,
               height: 44,

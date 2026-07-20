@@ -13,7 +13,6 @@ export function RpePicker({ value, onChange, disabled }: Props) {
     <div role="group" aria-label="Rate of Perceived Exertion">
       <div
         style={{
-          fontFamily: "'DM Mono', monospace",
           fontSize: '0.65rem',
           color: '#888',
           letterSpacing: '0.04em',
@@ -43,8 +42,7 @@ export function RpePicker({ value, onChange, disabled }: Props) {
                 border: `1px solid ${selected ? color : '#181818'}`,
                 borderRadius: 4,
                 color: selected ? '#000' : '#888',
-                fontFamily: "'DM Mono', monospace",
-                fontSize: '0.8rem',
+                  fontSize: '0.8rem',
                 fontWeight: selected ? 600 : 400,
                 cursor: disabled ? 'default' : 'pointer',
                 padding: 0,

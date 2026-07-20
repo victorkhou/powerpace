@@ -5,6 +5,7 @@ import { useActiveProgram } from '@/hooks/use-active-program'
 import { INCREMENTS, LIFT_LABELS, formatVolumePct } from '@/lib/progression'
 import type { WorkingWeight } from '@/types/database'
 import { PlateCalculatorSheet } from '@/components/today/plate-calculator-sheet'
+import { LoadingScreen } from '@/components/layout/page-shell'
 
 const LINEAR_ORDER = ['squat', 'bench', 'incline', 'ohp', 'deadlift', 'row', 'cgbp', 'rdl', 'goodMornings']
 const AUTO_ORDER = ['squatVol', 'benchVol', 'inclineVol', 'ohpVol', 'rowVol']
@@ -52,11 +53,7 @@ export default function WeightsPage() {
   }
 
   if (loading) {
-    return (
-      <div style={{ minHeight: '100vh', backgroundColor: '#0d0d0d', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <span style={{ fontFamily: "'DM Mono', monospace", color: '#666', fontSize: '0.8rem' }}>loading...</span>
-      </div>
-    )
+    return <LoadingScreen />
   }
 
   function renderWeightRow(key: string, ww: WorkingWeight | undefined, type: 'linear' | 'auto') {
@@ -81,36 +78,36 @@ export default function WeightsPage() {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <div style={{ flex: 1 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span style={{ fontFamily: "'DM Mono', monospace", fontSize: '0.8rem', color: '#d0d0d0' }}>
+              <span style={{ fontSize: '0.8rem', color: '#d0d0d0' }}>
                 {LIFT_LABELS[key] ?? key}
               </span>
               {type === 'auto' && (
-                <span style={{ fontFamily: "'DM Mono', monospace", fontSize: '0.55rem', color: '#47c8ff', border: '1px solid #47c8ff', borderRadius: 3, padding: '1px 4px' }}>auto @ {formatVolumePct(program?.volume_pct)}</span>
+                <span style={{ fontSize: '0.55rem', color: '#47c8ff', border: '1px solid #47c8ff', borderRadius: 3, padding: '1px 4px' }}>auto @ {formatVolumePct(program?.volume_pct)}</span>
               )}
               {ww.weight_lbs >= (ww.pr_lbs ?? 0) && ww.pr_lbs != null && ww.pr_lbs > 0 && (
-                <span style={{ fontFamily: "'DM Mono', monospace", fontSize: '0.55rem', color: '#4aff91', border: '1px solid #4aff91', borderRadius: 3, padding: '1px 4px' }}>PR</span>
+                <span style={{ fontSize: '0.55rem', color: '#4aff91', border: '1px solid #4aff91', borderRadius: 3, padding: '1px 4px' }}>PR</span>
               )}
             </div>
             {/* Stats row */}
             <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
               {ww.streak > 0 && (
-                <span style={{ fontFamily: "'DM Mono', monospace", fontSize: '0.6rem', color: '#4aff91' }}>
+                <span style={{ fontSize: '0.6rem', color: '#4aff91' }}>
                   streak {ww.streak}
                 </span>
               )}
               {ww.failures > 0 && (
-                <span style={{ fontFamily: "'DM Mono', monospace", fontSize: '0.6rem', color: ww.failures >= 2 ? '#f0a500' : '#666' }}>
+                <span style={{ fontSize: '0.6rem', color: ww.failures >= 2 ? '#f0a500' : '#666' }}>
                   {ww.failures} fail{ww.failures > 1 ? 's' : ''}
                 </span>
               )}
               {ww.pr_lbs != null && ww.pr_lbs > 0 && (
-                <span style={{ fontFamily: "'DM Mono', monospace", fontSize: '0.6rem', color: '#555' }}>
+                <span style={{ fontSize: '0.6rem', color: '#555' }}>
                   PR {ww.pr_lbs}
                 </span>
               )}
             </div>
             {inc && (
-              <div style={{ fontFamily: "'DM Mono', monospace", fontSize: '0.6rem', marginTop: 3, color: '#444' }}>
+              <div style={{ fontSize: '0.6rem', marginTop: 3, color: '#444' }}>
                 +{inc} lbs/session
               </div>
             )}
@@ -126,7 +123,7 @@ export default function WeightsPage() {
                     setEditValues({ ...editValues, [key]: newVal })
                     saveWeight(key, newVal)
                   }}
-                  style={{ width: 32, height: 32, borderRadius: 4, border: '1px solid #333', backgroundColor: '#181818', color: '#d0d0d0', fontFamily: "'DM Mono', monospace", fontSize: '0.9rem', cursor: 'pointer' }}
+                  style={{ width: 32, height: 32, borderRadius: 4, border: '1px solid #333', backgroundColor: '#181818', color: '#d0d0d0', fontSize: '0.9rem', cursor: 'pointer' }}
                 >−</button>
                 <input
                   type="number"
@@ -144,7 +141,7 @@ export default function WeightsPage() {
                       ;(e.target as HTMLInputElement).blur()
                     }
                   }}
-                  style={{ width: 64, height: 32, textAlign: 'center', backgroundColor: '#181818', border: '1px solid #333', borderRadius: 4, color: '#d0d0d0', fontFamily: "'DM Mono', monospace", fontSize: '0.85rem' }}
+                  style={{ width: 64, height: 32, textAlign: 'center', backgroundColor: '#181818', border: '1px solid #333', borderRadius: 4, color: '#d0d0d0', fontSize: '0.85rem' }}
                 />
                 <button
                   disabled={saving === key}
@@ -154,9 +151,9 @@ export default function WeightsPage() {
                     setEditValues({ ...editValues, [key]: newVal })
                     saveWeight(key, newVal)
                   }}
-                  style={{ width: 32, height: 32, borderRadius: 4, border: '1px solid #333', backgroundColor: '#181818', color: '#d0d0d0', fontFamily: "'DM Mono', monospace", fontSize: '0.9rem', cursor: 'pointer' }}
+                  style={{ width: 32, height: 32, borderRadius: 4, border: '1px solid #333', backgroundColor: '#181818', color: '#d0d0d0', fontSize: '0.9rem', cursor: 'pointer' }}
                 >+</button>
-                {saving === key && <span style={{ fontFamily: "'DM Mono', monospace", fontSize: '0.6rem', color: '#666' }}>...</span>}
+                {saving === key && <span style={{ fontSize: '0.6rem', color: '#666' }}>...</span>}
               </div>
             ) : (
               <button
@@ -192,10 +189,10 @@ export default function WeightsPage() {
       {/* Header */}
       <div style={{ padding: '20px 16px 14px', borderBottom: '1px solid #181818', position: 'sticky', top: 0, backgroundColor: '#0d0d0d', zIndex: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
-          <h1 style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: '2rem', color: '#e8ff47', letterSpacing: '0.05em', margin: 0, lineHeight: 1 }}>
+          <h1 style={{ fontSize: '2rem', color: '#e8ff47', letterSpacing: '0.05em', margin: 0, lineHeight: 1 }}>
             WEIGHTS
           </h1>
-          <div style={{ fontFamily: "'DM Mono', monospace", fontSize: '0.65rem', color: '#666', marginTop: 3 }}>
+          <div style={{ fontSize: '0.65rem', color: '#666', marginTop: 3 }}>
             week {program?.week_type} #{program?.week_number ?? 1}
           </div>
         </div>
@@ -207,7 +204,6 @@ export default function WeightsPage() {
             border: `1px solid ${editing ? '#4aff91' : '#333'}`,
             backgroundColor: editing ? 'rgba(74,255,145,0.08)' : '#181818',
             color: editing ? '#4aff91' : '#d0d0d0',
-            fontFamily: "'DM Mono', monospace",
             fontSize: '0.7rem',
             cursor: 'pointer',
             minHeight: 44,
@@ -219,13 +215,13 @@ export default function WeightsPage() {
 
       <div style={{ padding: '14px 16px 0' }}>
         {/* Linear lifts */}
-        <div style={{ fontFamily: "'DM Mono', monospace", fontSize: '0.65rem', color: '#555', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+        <div style={{ fontSize: '0.65rem', color: '#555', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
           progressable
         </div>
         {LINEAR_ORDER.map((key) => renderWeightRow(key, weights[key], 'linear'))}
 
         {/* Auto-derived */}
-        <div style={{ fontFamily: "'DM Mono', monospace", fontSize: '0.65rem', color: '#555', marginBottom: 8, marginTop: 20, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+        <div style={{ fontSize: '0.65rem', color: '#555', marginBottom: 8, marginTop: 20, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
           auto-derived
         </div>
         {AUTO_ORDER.map((key) => renderWeightRow(key, weights[key], 'auto'))}

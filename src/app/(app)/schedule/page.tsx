@@ -5,6 +5,7 @@ import { useActiveProgram } from '@/hooks/use-active-program'
 import type { WorkoutDay, Exercise } from '@/types/database'
 import { WeekSwap } from '@/components/schedule/week-swap'
 import { formatVolumePct } from '@/lib/progression'
+import { LoadingScreen } from '@/components/layout/page-shell'
 
 const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
@@ -49,11 +50,7 @@ export default function SchedulePage() {
   }, [refresh])
 
   if (loading) {
-    return (
-      <div style={{ minHeight: '100vh', backgroundColor: '#0d0d0d', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <span style={{ fontFamily: "'DM Mono', monospace", color: '#666', fontSize: '0.8rem' }}>loading...</span>
-      </div>
-    )
+    return <LoadingScreen />
   }
 
   // Filter days for the viewed week type
@@ -77,7 +74,7 @@ export default function SchedulePage() {
     <div style={{ minHeight: '100vh', backgroundColor: '#0d0d0d', paddingBottom: 72 }}>
       {/* Header */}
       <div style={{ padding: '20px 16px 14px', borderBottom: '1px solid #181818', position: 'sticky', top: 0, backgroundColor: '#0d0d0d', zIndex: 10 }}>
-        <h1 style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: '2rem', color: '#e8ff47', letterSpacing: '0.05em', margin: 0, lineHeight: 1 }}>
+        <h1 style={{ fontSize: '2rem', color: '#e8ff47', letterSpacing: '0.05em', margin: 0, lineHeight: 1 }}>
           SCHEDULE
         </h1>
 
@@ -93,8 +90,7 @@ export default function SchedulePage() {
                 border: `1px solid ${viewWeek === wt ? (wt === 'A' ? '#e8ff47' : '#47c8ff') : '#333'}`,
                 backgroundColor: viewWeek === wt ? (wt === 'A' ? '#e8ff47' : '#47c8ff') : '#111',
                 color: viewWeek === wt ? '#000' : '#555',
-                fontFamily: "'DM Mono', monospace",
-                fontSize: '0.8rem',
+                  fontSize: '0.8rem',
                 fontWeight: viewWeek === wt ? 600 : 400,
                 cursor: 'pointer',
                 minHeight: 44,
@@ -113,7 +109,7 @@ export default function SchedulePage() {
 
       {/* Day cards */}
       <div style={{ padding: '12px 16px 0' }}>
-        <p style={{ fontFamily: "'DM Mono', monospace", fontSize: '0.6rem', color: '#444', marginBottom: 10, lineHeight: 1.4 }}>
+        <p style={{ fontSize: '0.6rem', color: '#444', marginBottom: 10, lineHeight: 1.4 }}>
           recurring template (Week {viewWeek}). this-week swaps above override individual dates without changing the template.
         </p>
         {displayDays.map((day) => {
@@ -150,35 +146,35 @@ export default function SchedulePage() {
               >
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span style={{ fontFamily: "'DM Mono', monospace", fontSize: '0.65rem', color: '#555', minWidth: 28 }}>
+                    <span style={{ fontSize: '0.65rem', color: '#555', minWidth: 28 }}>
                       {DAY_NAMES[day.day_of_week]}
                     </span>
-                    <span style={{ fontFamily: "'DM Mono', monospace", fontSize: '0.85rem', fontWeight: 500, color: '#d0d0d0' }}>
+                    <span style={{ fontSize: '0.85rem', fontWeight: 500, color: '#d0d0d0' }}>
                       {day.name}
                     </span>
                     {day.variant && (
-                      <span style={{ fontSize: '0.6rem', fontFamily: "'DM Mono', monospace", color: '#c47fff', border: '1px solid #c47fff', borderRadius: 3, padding: '1px 5px' }}>
+                      <span style={{ fontSize: '0.6rem', color: '#c47fff', border: '1px solid #c47fff', borderRadius: 3, padding: '1px 5px' }}>
                         {day.variant}
                       </span>
                     )}
                     {isLiftDay && (
-                      <span style={{ fontSize: '0.55rem', fontFamily: "'DM Mono', monospace", color: volColor, border: `1px solid ${volColor}`, borderRadius: 3, padding: '1px 5px', letterSpacing: '0.05em' }}>
+                      <span style={{ fontSize: '0.55rem', color: volColor, border: `1px solid ${volColor}`, borderRadius: 3, padding: '1px 5px', letterSpacing: '0.05em' }}>
                         {day.is_volume ? 'VOL' : 'INT'}
                       </span>
                     )}
                     {isToday && (
-                      <span style={{ fontSize: '0.6rem', fontFamily: "'DM Mono', monospace", color: accent, border: `1px solid ${accent}`, borderRadius: 3, padding: '1px 5px' }}>
+                      <span style={{ fontSize: '0.6rem', color: accent, border: `1px solid ${accent}`, borderRadius: 3, padding: '1px 5px' }}>
                         today
                       </span>
                     )}
                   </div>
                   {day.tag && (
-                    <div style={{ fontFamily: "'DM Mono', monospace", fontSize: '0.65rem', color: '#555', marginTop: 2, marginLeft: 36 }}>
+                    <div style={{ fontSize: '0.65rem', color: '#555', marginTop: 2, marginLeft: 36 }}>
                       {day.tag}
                     </div>
                   )}
                 </div>
-                <span style={{ color: '#444', fontSize: '0.7rem', fontFamily: "'DM Mono', monospace" }}>
+                <span style={{ color: '#444', fontSize: '0.7rem', }}>
                   {isExpanded ? '▲' : '▼'}
                 </span>
               </button>
@@ -186,7 +182,7 @@ export default function SchedulePage() {
               {isExpanded && day.type !== 'rest' && (
                 <div style={{ backgroundColor: '#080808', borderTop: '1px solid #181818', padding: '10px 14px' }}>
                   {day.exercises.length === 0 ? (
-                    <p style={{ fontFamily: "'DM Mono', monospace", fontSize: '0.7rem', color: '#444' }}>No exercises.</p>
+                    <p style={{ fontSize: '0.7rem', color: '#444' }}>No exercises.</p>
                   ) : (
                     day.exercises.map((ex) => {
                       const w = ex.weight_key ? weights[ex.weight_key] : null
@@ -194,29 +190,29 @@ export default function SchedulePage() {
                         <div key={ex.id} style={{ marginBottom: 10, paddingBottom: 10, borderBottom: '1px solid #141414' }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                             <div>
-                              <span style={{ fontFamily: "'DM Mono', monospace", fontSize: '0.8rem', color: '#d0d0d0' }}>
+                              <span style={{ fontSize: '0.8rem', color: '#d0d0d0' }}>
                                 {ex.name}
                               </span>
                               {ex.is_auto_volume && (
-                                <div style={{ fontFamily: "'DM Mono', monospace", fontSize: '0.58rem', color: '#47c8ff', marginTop: 2 }}>
+                                <div style={{ fontSize: '0.58rem', color: '#47c8ff', marginTop: 2 }}>
                                   auto @ {formatVolumePct(program?.volume_pct)}
                                 </div>
                               )}
                             </div>
                             <div style={{ textAlign: 'right', flexShrink: 0, marginLeft: 12 }}>
                               {w && (
-                                <div style={{ fontFamily: "'DM Mono', monospace", fontSize: '0.8rem', fontWeight: 500, color: '#d0d0d0' }}>
+                                <div style={{ fontSize: '0.8rem', fontWeight: 500, color: '#d0d0d0' }}>
                                   {w.weight_lbs} lbs
                                 </div>
                               )}
-                              <div style={{ fontFamily: "'DM Mono', monospace", fontSize: '0.65rem', color: '#555', marginTop: 1 }}>
+                              <div style={{ fontSize: '0.65rem', color: '#555', marginTop: 1 }}>
                                 {ex.sets}×{ex.reps}
                               </div>
                               {ex.progression_type === 'auto' && (
-                                <div style={{ fontFamily: "'DM Mono', monospace", fontSize: '0.58rem', color: '#555' }}>auto</div>
+                                <div style={{ fontSize: '0.58rem', color: '#555' }}>auto</div>
                               )}
                               {ex.progression_type === 'bodyweight' && (
-                                <div style={{ fontFamily: "'DM Mono', monospace", fontSize: '0.58rem', color: '#555' }}>BW</div>
+                                <div style={{ fontSize: '0.58rem', color: '#555' }}>BW</div>
                               )}
                             </div>
                           </div>
@@ -229,7 +225,7 @@ export default function SchedulePage() {
 
               {isExpanded && day.type === 'rest' && (
                 <div style={{ backgroundColor: '#080808', borderTop: '1px solid #181818', padding: '12px 14px' }}>
-                  <span style={{ fontFamily: "'DM Mono', monospace", fontSize: '0.7rem', color: '#444' }}>
+                  <span style={{ fontSize: '0.7rem', color: '#444' }}>
                     rest & recovery
                   </span>
                 </div>

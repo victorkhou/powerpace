@@ -29,7 +29,6 @@ const fieldStyle = {
   border: `1px solid ${FIELD_BORDER}`,
   borderRadius: 4,
   color: TEXT_PRIMARY,
-  fontFamily: "'DM Mono', monospace",
   fontSize: '0.75rem',
 } as const
 
@@ -39,7 +38,6 @@ const buttonStyle = {
   border: `1px solid ${FIELD_BORDER}`,
   borderRadius: 4,
   color: TEXT_PRIMARY,
-  fontFamily: "'DM Mono', monospace",
   fontSize: '0.7rem',
   cursor: 'pointer',
   minHeight: 32,
@@ -270,7 +268,6 @@ export function TemplatesSection() {
           border: `1px solid ${PANEL_BORDER}`,
           borderRadius: 4,
           color: TEXT_PRIMARY,
-          fontFamily: "'DM Mono', monospace",
           fontSize: '0.75rem',
           cursor: 'pointer',
           letterSpacing: '0.05em',
@@ -283,9 +280,9 @@ export function TemplatesSection() {
 
       {expanded && (
         <div style={{ marginTop: 12 }}>
-          {loading && <p style={{ fontFamily: "'DM Mono', monospace", color: TEXT_FAINT, fontSize: '0.7rem' }}>loading...</p>}
+          {loading && <p style={{ color: TEXT_FAINT, fontSize: '0.7rem' }}>loading...</p>}
           {error && (
-            <p style={{ fontFamily: "'DM Mono', monospace", color: '#ff6b47', fontSize: '0.7rem', marginBottom: 8 }}>
+            <p style={{ color: '#ff6b47', fontSize: '0.7rem', marginBottom: 8 }}>
               {error}
             </p>
           )}
@@ -318,40 +315,40 @@ export function TemplatesSection() {
                   }}
                 >
                   <div style={{ textAlign: 'left' }}>
-                    <div style={{ fontFamily: "'DM Mono', monospace", fontSize: '0.65rem', color: TEXT_FAINT, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+                    <div style={{ fontSize: '0.65rem', color: TEXT_FAINT, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
                       {dayLabel}
                     </div>
                     <div style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: '1.4rem', color: ACCENT, letterSpacing: '0.05em', lineHeight: 1.1 }}>
                       {d.name}
                     </div>
                     {d.tag && (
-                      <div style={{ fontFamily: "'DM Mono', monospace", fontSize: '0.65rem', color: TEXT_MUTED, marginTop: 2 }}>
+                      <div style={{ fontSize: '0.65rem', color: TEXT_MUTED, marginTop: 2 }}>
                         {d.tag}
                       </div>
                     )}
                   </div>
-                  <span style={{ color: TEXT_FAINT, fontFamily: "'DM Mono', monospace", fontSize: '0.7rem' }}>{isOpen ? '▾' : '▸'}</span>
+                  <span style={{ color: TEXT_FAINT, fontSize: '0.7rem' }}>{isOpen ? '▾' : '▸'}</span>
                 </button>
 
                 {isOpen && (
                   <div style={{ marginTop: 12 }}>
                     {/* Day-level fields */}
                     <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '8px 10px', alignItems: 'center', marginBottom: 12 }}>
-                      <label style={{ fontFamily: "'DM Mono', monospace", fontSize: '0.65rem', color: TEXT_MUTED }}>name</label>
+                      <label style={{ fontSize: '0.65rem', color: TEXT_MUTED }}>name</label>
                       <input
                         type="text"
                         defaultValue={d.name}
                         onBlur={(e) => { const v = e.target.value.trim(); if (v && v !== d.name) patchDay(d.id, { name: v }) }}
                         style={{ ...fieldStyle, width: '100%' }}
                       />
-                      <label style={{ fontFamily: "'DM Mono', monospace", fontSize: '0.65rem', color: TEXT_MUTED }}>tag</label>
+                      <label style={{ fontSize: '0.65rem', color: TEXT_MUTED }}>tag</label>
                       <input
                         type="text"
                         defaultValue={d.tag ?? ''}
                         onBlur={(e) => { const v = e.target.value.trim() || null; if (v !== d.tag) patchDay(d.id, { tag: v }) }}
                         style={{ ...fieldStyle, width: '100%' }}
                       />
-                      <label style={{ fontFamily: "'DM Mono', monospace", fontSize: '0.65rem', color: TEXT_MUTED }}>type</label>
+                      <label style={{ fontSize: '0.65rem', color: TEXT_MUTED }}>type</label>
                       <select
                         value={d.type}
                         onChange={(e) => patchDay(d.id, { type: e.target.value as WorkoutDay['type'] })}
@@ -361,7 +358,7 @@ export function TemplatesSection() {
                           <option key={t} value={t}>{t}</option>
                         ))}
                       </select>
-                      <label style={{ fontFamily: "'DM Mono', monospace", fontSize: '0.65rem', color: TEXT_MUTED }}>volume day</label>
+                      <label style={{ fontSize: '0.65rem', color: TEXT_MUTED }}>volume day</label>
                       <input
                         type="checkbox"
                         checked={d.is_volume}
@@ -371,11 +368,11 @@ export function TemplatesSection() {
                     </div>
 
                     {/* Exercises */}
-                    <div style={{ fontFamily: "'DM Mono', monospace", fontSize: '0.65rem', color: TEXT_FAINT, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 6 }}>
+                    <div style={{ fontSize: '0.65rem', color: TEXT_FAINT, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 6 }}>
                       exercises
                     </div>
                     {d.exercises.length === 0 && (
-                      <p style={{ fontFamily: "'DM Mono', monospace", color: TEXT_FAINT, fontSize: '0.7rem' }}>(none)</p>
+                      <p style={{ color: TEXT_FAINT, fontSize: '0.7rem' }}>(none)</p>
                     )}
                     {d.exercises.map((e, idx) => (
                       <ExerciseRow
@@ -554,7 +551,7 @@ function ExerciseRow({
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-      <span style={{ fontFamily: "'DM Mono', monospace", fontSize: '0.6rem', color: TEXT_FAINT, letterSpacing: '0.05em', textTransform: 'uppercase' }}>{label}</span>
+      <span style={{ fontSize: '0.6rem', color: TEXT_FAINT, letterSpacing: '0.05em', textTransform: 'uppercase' }}>{label}</span>
       {children}
     </label>
   )

@@ -58,8 +58,7 @@ export function PlateCalculatorSheet({ weightLbs, barLbs = DEFAULT_BAR_LBS, open
           {label && (
             <div
               style={{
-                fontFamily: "'DM Mono', monospace",
-                fontSize: '0.65rem',
+                  fontSize: '0.65rem',
                 color: '#666',
                 textTransform: 'uppercase',
                 letterSpacing: '0.08em',
@@ -88,8 +87,7 @@ export function PlateCalculatorSheet({ weightLbs, barLbs = DEFAULT_BAR_LBS, open
             {result.belowBar ? (
               <div
                 style={{
-                  fontFamily: "'DM Mono', monospace",
-                  fontSize: '0.8rem',
+                      fontSize: '0.8rem',
                   color: '#f0a500',
                 }}
               >
@@ -98,8 +96,7 @@ export function PlateCalculatorSheet({ weightLbs, barLbs = DEFAULT_BAR_LBS, open
             ) : result.plates.length === 0 && result.exact ? (
               <div
                 style={{
-                  fontFamily: "'DM Mono', monospace",
-                  fontSize: '0.8rem',
+                      fontSize: '0.8rem',
                   color: '#d0d0d0',
                 }}
               >
@@ -114,8 +111,7 @@ export function PlateCalculatorSheet({ weightLbs, barLbs = DEFAULT_BAR_LBS, open
                   <>
                     <div
                       style={{
-                        fontFamily: "'DM Mono', monospace",
-                        fontSize: '0.7rem',
+                                  fontSize: '0.7rem',
                         color: '#f0a500',
                       }}
                     >
@@ -123,8 +119,7 @@ export function PlateCalculatorSheet({ weightLbs, barLbs = DEFAULT_BAR_LBS, open
                     </div>
                     <div
                       style={{
-                        fontFamily: "'DM Mono', monospace",
-                        fontSize: '0.65rem',
+                                  fontSize: '0.65rem',
                         color: '#888',
                         marginTop: 4,
                       }}
@@ -151,8 +146,7 @@ export function PlateCalculatorSheet({ weightLbs, barLbs = DEFAULT_BAR_LBS, open
                       <span
                         key={`${p}-${i}`}
                         style={{
-                          fontFamily: "'DM Mono', monospace",
-                          fontSize: '0.8rem',
+                                      fontSize: '0.8rem',
                           color: c,
                           border: `1px solid ${c}`,
                           borderRadius: 4,
@@ -173,8 +167,7 @@ export function PlateCalculatorSheet({ weightLbs, barLbs = DEFAULT_BAR_LBS, open
                 {/* Sum line */}
                 <div
                   style={{
-                    fontFamily: "'DM Mono', monospace",
-                    fontSize: '0.75rem',
+                          fontSize: '0.75rem',
                     color: '#d0d0d0',
                     marginBottom: result.exact ? 0 : 8,
                   }}
@@ -187,8 +180,7 @@ export function PlateCalculatorSheet({ weightLbs, barLbs = DEFAULT_BAR_LBS, open
                 {!result.exact && (
                   <div
                     style={{
-                      fontFamily: "'DM Mono', monospace",
-                      fontSize: '0.7rem',
+                              fontSize: '0.7rem',
                       color: '#f0a500',
                       marginTop: 6,
                     }}
@@ -211,7 +203,6 @@ export function PlateCalculatorSheet({ weightLbs, barLbs = DEFAULT_BAR_LBS, open
               border: '1px solid #333',
               borderRadius: 4,
               color: '#d0d0d0',
-              fontFamily: "'DM Mono', monospace",
               fontSize: '0.75rem',
               cursor: 'pointer',
               letterSpacing: '0.05em',

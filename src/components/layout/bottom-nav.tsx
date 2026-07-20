@@ -50,7 +50,6 @@ export function BottomNav() {
           >
             <span style={{ fontSize: '1rem', lineHeight: 1 }}>{item.icon}</span>
             <span style={{
-              fontFamily: "'DM Mono', monospace",
               fontSize: '0.6rem',
               letterSpacing: '0.03em',
               color: active ? '#e8ff47' : '#444',

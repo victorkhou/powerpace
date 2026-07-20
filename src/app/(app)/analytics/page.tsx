@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts'
 import { LIFT_LABELS } from '@/lib/progression'
+import { LoadingScreen } from '@/components/layout/page-shell'
 
 type VolumePoint = { date: string; week: number; volume: number }
 type ProgressionPoint = { key: string; weight: number; reason: string; date: string }
@@ -39,11 +40,7 @@ export default function AnalyticsPage() {
   }, [])
 
   if (loading) {
-    return (
-      <div style={{ minHeight: '100vh', backgroundColor: '#0d0d0d', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <span style={{ fontFamily: "'DM Mono', monospace", color: '#666', fontSize: '0.8rem' }}>loading...</span>
-      </div>
-    )
+    return <LoadingScreen />
   }
 
   const liftData = progression
@@ -56,7 +53,7 @@ export default function AnalyticsPage() {
     <div style={{ minHeight: '100vh', backgroundColor: '#0d0d0d', paddingBottom: 72 }}>
       {/* Header */}
       <div style={{ padding: '20px 16px 14px', borderBottom: '1px solid #181818', position: 'sticky', top: 0, backgroundColor: '#0d0d0d', zIndex: 10 }}>
-        <h1 style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: '2rem', color: '#e8ff47', letterSpacing: '0.05em', margin: 0, lineHeight: 1 }}>
+        <h1 style={{ fontSize: '2rem', color: '#e8ff47', letterSpacing: '0.05em', margin: 0, lineHeight: 1 }}>
           ANALYTICS
         </h1>
         <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
@@ -68,7 +65,6 @@ export default function AnalyticsPage() {
               border: `1px solid ${tab === 'volume' ? '#e8ff47' : '#333'}`,
               backgroundColor: tab === 'volume' ? '#e8ff47' : '#111',
               color: tab === 'volume' ? '#000' : '#666',
-              fontFamily: "'DM Mono', monospace",
               fontSize: '0.7rem',
               cursor: 'pointer',
               minHeight: 44,
@@ -82,7 +78,6 @@ export default function AnalyticsPage() {
               border: `1px solid ${tab === 'lifts' ? '#e8ff47' : '#333'}`,
               backgroundColor: tab === 'lifts' ? '#e8ff47' : '#111',
               color: tab === 'lifts' ? '#000' : '#666',
-              fontFamily: "'DM Mono', monospace",
               fontSize: '0.7rem',
               cursor: 'pointer',
               minHeight: 44,
@@ -94,12 +89,12 @@ export default function AnalyticsPage() {
       <div style={{ padding: '14px 16px 0' }}>
         {tab === 'volume' && (
           volume.length === 0 ? (
-            <p style={{ fontFamily: "'DM Mono', monospace", color: '#444', fontSize: '0.8rem', textAlign: 'center', paddingTop: 40 }}>
+            <p style={{ color: '#444', fontSize: '0.8rem', textAlign: 'center', paddingTop: 40 }}>
               Log some sessions to see volume data.
             </p>
           ) : (
             <div>
-              <div style={{ fontFamily: "'DM Mono', monospace", fontSize: '0.65rem', color: '#555', marginBottom: 12 }}>
+              <div style={{ fontSize: '0.65rem', color: '#555', marginBottom: 12 }}>
                 total volume per session (lbs)
               </div>
               <div style={{ width: '100%', height: 260 }}>
@@ -151,8 +146,7 @@ export default function AnalyticsPage() {
                     border: `1px solid ${selectedLift === key ? (LIFT_COLORS[key] ?? '#e8ff47') : '#333'}`,
                     backgroundColor: selectedLift === key ? 'rgba(232,255,71,0.08)' : '#111',
                     color: selectedLift === key ? (LIFT_COLORS[key] ?? '#e8ff47') : '#555',
-                    fontFamily: "'DM Mono', monospace",
-                    fontSize: '0.65rem',
+                          fontSize: '0.65rem',
                     cursor: 'pointer',
                     minHeight: 36,
                   }}
@@ -163,7 +157,7 @@ export default function AnalyticsPage() {
             </div>
 
             {liftData.length === 0 ? (
-              <p style={{ fontFamily: "'DM Mono', monospace", color: '#444', fontSize: '0.8rem', textAlign: 'center', paddingTop: 40 }}>
+              <p style={{ color: '#444', fontSize: '0.8rem', textAlign: 'center', paddingTop: 40 }}>
                 No progression data for {LIFT_LABELS[selectedLift] ?? selectedLift} yet.
               </p>
             ) : (

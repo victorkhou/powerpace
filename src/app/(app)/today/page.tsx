@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, useRef } from 'react'
+import { LoadingScreen } from '@/components/layout/page-shell'
 import { useActiveProgram } from '@/hooks/use-active-program'
 import { useSessionStore } from '@/store/session-store'
 import { useTimerStore } from '@/store/timer-store'
@@ -233,9 +234,7 @@ export default function TodayPage() {
 
   if (loading) {
     return (
-      <div style={{ minHeight: '100vh', backgroundColor: '#0d0d0d', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <span style={{ fontFamily: "'DM Mono', monospace", color: '#666', fontSize: '0.8rem' }}>loading...</span>
-      </div>
+      <LoadingScreen />
     )
   }
 
@@ -243,10 +242,10 @@ export default function TodayPage() {
   if (todayWorkout?.type === 'rest') {
     return (
       <div style={{ minHeight: '100vh', backgroundColor: '#0d0d0d', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '0 24px' }}>
-        <h1 style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: '4rem', color: '#4aff91', letterSpacing: '0.05em', marginBottom: 8 }}>
+        <h1 style={{ fontSize: '4rem', color: '#4aff91', letterSpacing: '0.05em', marginBottom: 8 }}>
           REST DAY
         </h1>
-        <p style={{ fontFamily: "'DM Mono', monospace", color: '#666', fontSize: '0.8rem' }}>
+        <p style={{ color: '#666', fontSize: '0.8rem' }}>
           Recovery. You earned it.
         </p>
       </div>
@@ -272,7 +271,7 @@ export default function TodayPage() {
           <div>
             <h1
               style={{
-                fontFamily: "'Bebas Neue', sans-serif",
+                
                 fontSize: '2rem',
                 color: accentColor,
                 letterSpacing: '0.05em',
@@ -282,7 +281,7 @@ export default function TodayPage() {
             >
               {todayWorkout?.name ?? 'Today'}
             </h1>
-            <div style={{ fontFamily: "'DM Mono', monospace", fontSize: '0.65rem', color: '#666', marginTop: 3 }}>
+            <div style={{ fontSize: '0.65rem', color: '#666', marginTop: 3 }}>
               {todayWorkout?.tag && <span style={{ marginRight: 8 }}>{todayWorkout.tag}</span>}
               <span style={{ color: program?.week_type === 'A' ? '#e8ff47' : '#47c8ff' }}>
                 week {program?.week_type}
@@ -291,18 +290,18 @@ export default function TodayPage() {
             </div>
           </div>
           <div style={{ textAlign: 'right' }}>
-            <div style={{ fontFamily: "'DM Mono', monospace", fontSize: '0.75rem', color: '#d0d0d0' }}>
+            <div style={{ fontSize: '0.75rem', color: '#d0d0d0' }}>
               {exercisesDone}/{exercises.length}
             </div>
             {liveVolume > 0 && (
-              <div style={{ fontFamily: "'DM Mono', monospace", fontSize: '0.65rem', color: '#666' }}>
+              <div style={{ fontSize: '0.65rem', color: '#666' }}>
                 {Math.round(liveVolume).toLocaleString()} lbs
               </div>
             )}
           </div>
         </div>
         {performedVariant && (
-          <div style={{ marginTop: 8, padding: '5px 10px', backgroundColor: 'rgba(232,255,71,0.05)', border: '1px solid #333', borderRadius: 4, fontFamily: "'DM Mono', monospace", fontSize: '0.65rem', color: '#888' }}>
+          <div style={{ marginTop: 8, padding: '5px 10px', backgroundColor: 'rgba(232,255,71,0.05)', border: '1px solid #333', borderRadius: 4, fontSize: '0.65rem', color: '#888' }}>
             {performedVariant} active{willAdvanceFridayAlt ? ` · next: ${program?.friday_alt === 'A1' ? 'A2' : 'A1'}` : ''}
           </div>
         )}
@@ -314,7 +313,6 @@ export default function TodayPage() {
               backgroundColor: isVolumeDay ? 'rgba(71,200,255,0.06)' : 'rgba(232,255,71,0.06)',
               border: `1px solid ${isVolumeDay ? '#47c8ff' : '#e8ff47'}`,
               borderRadius: 4,
-              fontFamily: "'DM Mono', monospace",
               fontSize: '0.65rem',
               color: isVolumeDay ? '#47c8ff' : '#e8ff47',
               letterSpacing: '0.05em',
@@ -328,7 +326,7 @@ export default function TodayPage() {
       {/* Exercise list */}
       <div style={{ padding: '14px 16px 0' }}>
         {exercises.length === 0 ? (
-          <p style={{ fontFamily: "'DM Mono', monospace", color: '#444', fontSize: '0.8rem', textAlign: 'center', paddingTop: 40 }}>
+          <p style={{ color: '#444', fontSize: '0.8rem', textAlign: 'center', paddingTop: 40 }}>
             No exercises for today.
           </p>
         ) : (
@@ -357,7 +355,7 @@ export default function TodayPage() {
           >
             <RpePicker value={rpe} onChange={handleRpeChange} disabled={undoing} />
             {rpeError && (
-              <p style={{ fontFamily: "'DM Mono', monospace", color: '#ff6b47', fontSize: '0.7rem', marginTop: 8 }}>
+              <p style={{ color: '#ff6b47', fontSize: '0.7rem', marginTop: 8 }}>
                 {rpeError}
               </p>
             )}
@@ -375,7 +373,6 @@ export default function TodayPage() {
               backgroundColor: '#0f0f0f',
               border: '1px solid #181818',
               color: '#d0d0d0',
-              fontFamily: "'DM Mono', monospace",
               fontSize: '0.75rem',
               marginTop: 8,
               resize: 'none',
@@ -384,7 +381,7 @@ export default function TodayPage() {
         )}
 
         {error && (
-          <p style={{ fontFamily: "'DM Mono', monospace", color: '#ff6b47', fontSize: '0.7rem', marginTop: 8 }}>
+          <p style={{ color: '#ff6b47', fontSize: '0.7rem', marginTop: 8 }}>
             {error}
           </p>
         )}
@@ -418,8 +415,7 @@ export default function TodayPage() {
                 border: '1px solid #333',
                 borderRadius: 4,
                 color: '#666',
-                fontFamily: "'DM Mono', monospace",
-                fontSize: '0.7rem',
+                  fontSize: '0.7rem',
                 cursor: 'pointer',
                 minWidth: 64,
               }}
@@ -436,8 +432,7 @@ export default function TodayPage() {
                 border: allComplete ? 'none' : '1px solid #333',
                 borderRadius: 4,
                 color: allComplete ? '#000' : '#555',
-                fontFamily: "'DM Mono', monospace",
-                fontSize: '0.85rem',
+                  fontSize: '0.85rem',
                 fontWeight: 600,
                 letterSpacing: '0.04em',
                 cursor: logging ? 'default' : 'pointer',
@@ -461,7 +456,7 @@ export default function TodayPage() {
               padding: '0 16px',
             }}
           >
-            <span style={{ fontFamily: "'DM Mono', monospace", fontSize: '0.75rem', color: '#4aff91' }}>
+            <span style={{ fontSize: '0.75rem', color: '#4aff91' }}>
               SESSION LOGGED
             </span>
             <button
@@ -471,8 +466,7 @@ export default function TodayPage() {
                 backgroundColor: 'transparent',
                 border: 'none',
                 color: '#ff6b47',
-                fontFamily: "'DM Mono', monospace",
-                fontSize: '0.7rem',
+                  fontSize: '0.7rem',
                 cursor: 'pointer',
                 padding: '4px 8px',
               }}

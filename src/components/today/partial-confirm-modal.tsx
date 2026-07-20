@@ -19,7 +19,6 @@ export function PartialConfirmModal({ open, onSkip, onLogPartial, onClose }: Pro
           border: '1px solid #181818',
           color: '#d0d0d0',
           maxWidth: 360,
-          fontFamily: "'DM Mono', monospace",
         }}
       >
         <DialogTitle
@@ -44,7 +43,6 @@ export function PartialConfirmModal({ open, onSkip, onLogPartial, onClose }: Pro
               backgroundColor: '#111',
               border: '1px solid #333',
               color: '#d0d0d0',
-              fontFamily: "'DM Mono', monospace",
               fontSize: '0.75rem',
               height: 44,
             }}
@@ -56,7 +54,6 @@ export function PartialConfirmModal({ open, onSkip, onLogPartial, onClose }: Pro
             style={{
               backgroundColor: '#f0a500',
               color: '#000',
-              fontFamily: "'DM Mono', monospace",
               fontSize: '0.75rem',
               fontWeight: 600,
               height: 44,

@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { useActiveProgram } from '@/hooks/use-active-program'
 import { TemplatesSection } from '@/components/settings/templates-section'
+import { LoadingScreen } from '@/components/layout/page-shell'
 
 export default function SettingsPage() {
   const { program, loading, refresh } = useActiveProgram()
@@ -94,34 +95,30 @@ export default function SettingsPage() {
   }
 
   if (loading) {
-    return (
-      <div style={{ minHeight: '100vh', backgroundColor: '#0d0d0d', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <span style={{ fontFamily: "'DM Mono', monospace", color: '#666', fontSize: '0.8rem' }}>loading...</span>
-      </div>
-    )
+    return <LoadingScreen />
   }
 
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#0d0d0d', paddingBottom: 72 }}>
       {/* Header */}
       <div style={{ padding: '20px 16px 14px', borderBottom: '1px solid #181818' }}>
-        <h1 style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: '2rem', color: '#e8ff47', letterSpacing: '0.05em', margin: 0, lineHeight: 1 }}>
+        <h1 style={{ fontSize: '2rem', color: '#e8ff47', letterSpacing: '0.05em', margin: 0, lineHeight: 1 }}>
           SETTINGS
         </h1>
       </div>
 
       <div style={{ padding: '14px 16px 0' }}>
         {/* Program info */}
-        <div style={{ fontFamily: "'DM Mono', monospace", fontSize: '0.65rem', color: '#555', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+        <div style={{ fontSize: '0.65rem', color: '#555', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
           program
         </div>
         <div style={{ backgroundColor: '#0f0f0f', border: '1px solid #181818', borderRadius: 4, padding: '14px' }}>
-          <div style={{ fontFamily: "'DM Mono', monospace", fontSize: '0.85rem', color: '#d0d0d0', marginBottom: 12 }}>
+          <div style={{ fontSize: '0.85rem', color: '#d0d0d0', marginBottom: 12 }}>
             {program?.name ?? 'Power + Pace'}
           </div>
           {/* Week type toggle */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 12 }}>
-            <label style={{ fontFamily: "'DM Mono', monospace", fontSize: '0.7rem', color: '#888', flexShrink: 0 }}>
+            <label style={{ fontSize: '0.7rem', color: '#888', flexShrink: 0 }}>
               week type:
             </label>
             <button
@@ -133,8 +130,7 @@ export default function SettingsPage() {
                 border: `1px solid ${program?.week_type === 'A' ? '#e8ff47' : '#47c8ff'}`,
                 backgroundColor: program?.week_type === 'A' ? '#e8ff47' : '#47c8ff',
                 color: '#000',
-                fontFamily: "'DM Mono', monospace",
-                fontSize: '0.85rem',
+                  fontSize: '0.85rem',
                 fontWeight: 600,
                 cursor: 'pointer',
                 minHeight: 44,
@@ -142,12 +138,12 @@ export default function SettingsPage() {
             >
               {program?.week_type ?? 'A'}
             </button>
-            <span style={{ fontFamily: "'DM Mono', monospace", fontSize: '0.65rem', color: '#555' }}>tap to toggle</span>
+            <span style={{ fontSize: '0.65rem', color: '#555' }}>tap to toggle</span>
           </div>
 
           {/* Week number */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 12 }}>
-            <label style={{ fontFamily: "'DM Mono', monospace", fontSize: '0.7rem', color: '#888', flexShrink: 0 }}>
+            <label style={{ fontSize: '0.7rem', color: '#888', flexShrink: 0 }}>
               week #:
             </label>
             <input
@@ -155,12 +151,12 @@ export default function SettingsPage() {
               value={weekInput}
               onChange={(e) => setWeekInput(e.target.value)}
               min={1}
-              style={{ width: 56, height: 36, textAlign: 'center', backgroundColor: '#181818', border: '1px solid #333', borderRadius: 4, color: '#d0d0d0', fontFamily: "'DM Mono', monospace", fontSize: '0.85rem' }}
+              style={{ width: 56, height: 36, textAlign: 'center', backgroundColor: '#181818', border: '1px solid #333', borderRadius: 4, color: '#d0d0d0', fontSize: '0.85rem' }}
             />
             <button
               onClick={saveWeek}
               disabled={saving}
-              style={{ padding: '6px 12px', borderRadius: 4, border: '1px solid #333', backgroundColor: '#181818', color: '#d0d0d0', fontFamily: "'DM Mono', monospace", fontSize: '0.7rem', cursor: 'pointer', minHeight: 36 }}
+              style={{ padding: '6px 12px', borderRadius: 4, border: '1px solid #333', backgroundColor: '#181818', color: '#d0d0d0', fontSize: '0.7rem', cursor: 'pointer', minHeight: 36 }}
             >
               {saving ? '...' : 'save'}
             </button>
@@ -168,7 +164,7 @@ export default function SettingsPage() {
 
           {/* Deload week */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 12 }}>
-            <label style={{ fontFamily: "'DM Mono', monospace", fontSize: '0.7rem', color: '#888', flexShrink: 0 }}>
+            <label style={{ fontSize: '0.7rem', color: '#888', flexShrink: 0 }}>
               deload wk:
             </label>
             <input
@@ -177,23 +173,23 @@ export default function SettingsPage() {
               onChange={(e) => setDeloadInput(e.target.value)}
               min={1}
               placeholder="none"
-              style={{ width: 56, height: 36, textAlign: 'center', backgroundColor: '#181818', border: '1px solid #333', borderRadius: 4, color: '#d0d0d0', fontFamily: "'DM Mono', monospace", fontSize: '0.85rem' }}
+              style={{ width: 56, height: 36, textAlign: 'center', backgroundColor: '#181818', border: '1px solid #333', borderRadius: 4, color: '#d0d0d0', fontSize: '0.85rem' }}
             />
             <button
               onClick={saveDeloadWeek}
               disabled={saving}
-              style={{ padding: '6px 12px', borderRadius: 4, border: '1px solid #333', backgroundColor: '#181818', color: '#d0d0d0', fontFamily: "'DM Mono', monospace", fontSize: '0.7rem', cursor: 'pointer', minHeight: 36 }}
+              style={{ padding: '6px 12px', borderRadius: 4, border: '1px solid #333', backgroundColor: '#181818', color: '#d0d0d0', fontSize: '0.7rem', cursor: 'pointer', minHeight: 36 }}
             >
               {saving ? '...' : 'save'}
             </button>
-            <span style={{ fontFamily: "'DM Mono', monospace", fontSize: '0.6rem', color: '#555' }}>
+            <span style={{ fontSize: '0.6rem', color: '#555' }}>
               (blank = none)
             </span>
           </div>
 
           {/* Volume % — multiplier for auto-derived volume weights */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 12 }}>
-            <label style={{ fontFamily: "'DM Mono', monospace", fontSize: '0.7rem', color: '#888', flexShrink: 0 }}>
+            <label style={{ fontSize: '0.7rem', color: '#888', flexShrink: 0 }}>
               volume %:
             </label>
             <input
@@ -203,29 +199,29 @@ export default function SettingsPage() {
               min={1}
               max={100}
               step={0.5}
-              style={{ width: 56, height: 36, textAlign: 'center', backgroundColor: '#181818', border: '1px solid #333', borderRadius: 4, color: '#d0d0d0', fontFamily: "'DM Mono', monospace", fontSize: '0.85rem' }}
+              style={{ width: 56, height: 36, textAlign: 'center', backgroundColor: '#181818', border: '1px solid #333', borderRadius: 4, color: '#d0d0d0', fontSize: '0.85rem' }}
             />
             <button
               onClick={saveVolumePct}
               disabled={saving}
-              style={{ padding: '6px 12px', borderRadius: 4, border: '1px solid #333', backgroundColor: '#181818', color: '#d0d0d0', fontFamily: "'DM Mono', monospace", fontSize: '0.7rem', cursor: 'pointer', minHeight: 36 }}
+              style={{ padding: '6px 12px', borderRadius: 4, border: '1px solid #333', backgroundColor: '#181818', color: '#d0d0d0', fontSize: '0.7rem', cursor: 'pointer', minHeight: 36 }}
             >
               {saving ? '...' : 'save'}
             </button>
-            <span style={{ fontFamily: "'DM Mono', monospace", fontSize: '0.6rem', color: '#555' }}>
+            <span style={{ fontSize: '0.6rem', color: '#555' }}>
               (of intensity; recalcs now)
             </span>
           </div>
 
           {/* Friday alternation */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 12 }}>
-            <label style={{ fontFamily: "'DM Mono', monospace", fontSize: '0.7rem', color: '#888', flexShrink: 0 }}>
+            <label style={{ fontSize: '0.7rem', color: '#888', flexShrink: 0 }}>
               friday alt:
             </label>
-            <span style={{ fontFamily: "'DM Mono', monospace", fontSize: '0.85rem', color: '#c47fff' }}>
+            <span style={{ fontSize: '0.85rem', color: '#c47fff' }}>
               {program?.friday_alt ?? 'A1'}
             </span>
-            <span style={{ fontFamily: "'DM Mono', monospace", fontSize: '0.6rem', color: '#555' }}>
+            <span style={{ fontSize: '0.6rem', color: '#555' }}>
               (auto-advances on log)
             </span>
           </div>
@@ -245,7 +241,6 @@ export default function SettingsPage() {
               border: '1px solid #333',
               backgroundColor: '#0f0f0f',
               color: '#ff6b47',
-              fontFamily: "'DM Mono', monospace",
               fontSize: '0.8rem',
               cursor: 'pointer',
               minHeight: 48,

@@ -73,8 +73,7 @@ export function ExerciseCard({ exercise, weight, disabled, isVolumeDay, volumePc
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
             <span
               style={{
-                fontFamily: "'DM Mono', monospace",
-                fontSize: '0.85rem',
+                  fontSize: '0.85rem',
                 fontWeight: 500,
                 color: '#d0d0d0',
               }}
@@ -85,8 +84,7 @@ export function ExerciseCard({ exercise, weight, disabled, isVolumeDay, volumePc
               <span
                 style={{
                   fontSize: '0.55rem',
-                  fontFamily: "'DM Mono', monospace",
-                  color: '#47c8ff',
+                      color: '#47c8ff',
                   border: '1px solid #47c8ff',
                   borderRadius: 3,
                   padding: '1px 5px',
@@ -100,8 +98,7 @@ export function ExerciseCard({ exercise, weight, disabled, isVolumeDay, volumePc
               <span
                 style={{
                   fontSize: '0.6rem',
-                  fontFamily: "'DM Mono', monospace",
-                  color: '#4aff91',
+                      color: '#4aff91',
                   border: '1px solid #4aff91',
                   borderRadius: 3,
                   padding: '1px 5px',
@@ -115,8 +112,7 @@ export function ExerciseCard({ exercise, weight, disabled, isVolumeDay, volumePc
               <span
                 style={{
                   fontSize: '0.6rem',
-                  fontFamily: "'DM Mono', monospace",
-                  color: '#e8ff47',
+                      color: '#e8ff47',
                   border: '1px solid #e8ff47',
                   borderRadius: 3,
                   padding: '1px 5px',
@@ -129,8 +125,7 @@ export function ExerciseCard({ exercise, weight, disabled, isVolumeDay, volumePc
               <span
                 style={{
                   fontSize: '0.6rem',
-                  fontFamily: "'DM Mono', monospace",
-                  color: weight!.failures >= 3 ? '#ff6b47' : '#f0a500',
+                      color: weight!.failures >= 3 ? '#ff6b47' : '#f0a500',
                   border: `1px solid ${weight!.failures >= 3 ? '#ff6b47' : '#f0a500'}`,
                   borderRadius: 3,
                   padding: '1px 5px',
@@ -143,7 +138,6 @@ export function ExerciseCard({ exercise, weight, disabled, isVolumeDay, volumePc
 
           <div
             style={{
-              fontFamily: "'DM Mono', monospace",
               fontSize: '0.7rem',
               color: '#666',
               marginTop: 2,
@@ -162,8 +156,7 @@ export function ExerciseCard({ exercise, weight, disabled, isVolumeDay, volumePc
                     margin: 0,
                     color: '#d0d0d0',
                     fontWeight: 500,
-                    fontFamily: "'DM Mono', monospace",
-                    fontSize: '0.7rem',
+                          fontSize: '0.7rem',
                     cursor: 'pointer',
                     textDecoration: 'underline dotted',
                     textUnderlineOffset: 3,
@@ -213,8 +206,7 @@ export function ExerciseCard({ exercise, weight, disabled, isVolumeDay, volumePc
               ))}
               <span
                 style={{
-                  fontFamily: "'DM Mono', monospace",
-                  fontSize: '0.7rem',
+                      fontSize: '0.7rem',
                   color: completedCount === totalSets ? '#4aff91' : '#666',
                   minWidth: 28,
                   textAlign: 'right',
@@ -248,7 +240,6 @@ export function ExerciseCard({ exercise, weight, disabled, isVolumeDay, volumePc
               backgroundColor: '#111',
               border: '1px solid #333',
               color: '#d0d0d0',
-              fontFamily: "'DM Mono', monospace",
               fontSize: '0.75rem',
               height: 36,
             }}

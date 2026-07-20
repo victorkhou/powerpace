@@ -142,7 +142,6 @@ export function WeekSwap({ onChanged }: { onChanged?: () => void }) {
           border: '1px solid #181818',
           borderRadius: 4,
           color: '#d0d0d0',
-          fontFamily: "'DM Mono', monospace",
           fontSize: '0.75rem',
           cursor: 'pointer',
           letterSpacing: '0.05em',
@@ -155,14 +154,14 @@ export function WeekSwap({ onChanged }: { onChanged?: () => void }) {
 
       {expanded && (
         <div style={{ marginTop: 10 }}>
-          {loading && <p style={{ fontFamily: "'DM Mono', monospace", color: '#555', fontSize: '0.7rem' }}>loading...</p>}
+          {loading && <p style={{ color: '#555', fontSize: '0.7rem' }}>loading...</p>}
           {error && (
-            <p style={{ fontFamily: "'DM Mono', monospace", color: '#ff6b47', fontSize: '0.7rem', marginBottom: 8 }}>
+            <p style={{ color: '#ff6b47', fontSize: '0.7rem', marginBottom: 8 }}>
               {error}
             </p>
           )}
 
-          <p style={{ fontFamily: "'DM Mono', monospace", color: '#555', fontSize: '0.62rem', marginBottom: 8, lineHeight: 1.4 }}>
+          <p style={{ color: '#555', fontSize: '0.62rem', marginBottom: 8, lineHeight: 1.4 }}>
             pick two days to swap their workouts for this week. logged days are locked.
           </p>
 
@@ -189,24 +188,24 @@ export function WeekSwap({ onChanged }: { onChanged?: () => void }) {
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <span style={{ fontFamily: "'DM Mono', monospace", fontSize: '0.62rem', color: '#555', minWidth: 54 }}>
+                  <span style={{ fontSize: '0.62rem', color: '#555', minWidth: 54 }}>
                     {DAY_NAMES[row.dayOfWeek]} {mm}/{dd}
                   </span>
-                  <span style={{ fontFamily: "'DM Mono', monospace", fontSize: '0.8rem', color: wd ? '#d0d0d0' : '#444', borderLeft: `2px solid ${accent}`, paddingLeft: 8 }}>
+                  <span style={{ fontSize: '0.8rem', color: wd ? '#d0d0d0' : '#444', borderLeft: `2px solid ${accent}`, paddingLeft: 8 }}>
                     {wd?.name ?? 'Rest'}
                   </span>
                   {wd?.variant && (
-                    <span style={{ fontSize: '0.55rem', fontFamily: "'DM Mono', monospace", color: '#c47fff', border: '1px solid #c47fff', borderRadius: 3, padding: '1px 4px' }}>
+                    <span style={{ fontSize: '0.55rem', color: '#c47fff', border: '1px solid #c47fff', borderRadius: 3, padding: '1px 4px' }}>
                       {wd.variant}
                     </span>
                   )}
                   {row.isOverridden && (
-                    <span style={{ fontSize: '0.55rem', fontFamily: "'DM Mono', monospace", color: '#47c8ff', border: '1px solid #47c8ff', borderRadius: 3, padding: '1px 4px' }}>
+                    <span style={{ fontSize: '0.55rem', color: '#47c8ff', border: '1px solid #47c8ff', borderRadius: 3, padding: '1px 4px' }}>
                       moved
                     </span>
                   )}
                   {row.locked && (
-                    <span style={{ fontSize: '0.55rem', fontFamily: "'DM Mono', monospace", color: '#888' }}>
+                    <span style={{ fontSize: '0.55rem', color: '#888' }}>
                       logged
                     </span>
                   )}
@@ -220,8 +219,7 @@ export function WeekSwap({ onChanged }: { onChanged?: () => void }) {
                       border: '1px solid #333',
                       borderRadius: 3,
                       color: '#888',
-                      fontFamily: "'DM Mono', monospace",
-                      fontSize: '0.6rem',
+                              fontSize: '0.6rem',
                       padding: '3px 7px',
                       cursor: 'pointer',
                     }}
@@ -244,7 +242,6 @@ export function WeekSwap({ onChanged }: { onChanged?: () => void }) {
               border: 'none',
               backgroundColor: selected.length === 2 && !busy ? '#e8ff47' : '#1a1a1a',
               color: selected.length === 2 && !busy ? '#000' : '#555',
-              fontFamily: "'DM Mono', monospace",
               fontSize: '0.75rem',
               fontWeight: 600,
               cursor: selected.length === 2 && !busy ? 'pointer' : 'default',

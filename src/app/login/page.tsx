@@ -46,11 +46,11 @@ export default function LoginPage() {
         <div className="text-center">
           <h1
             className="text-5xl tracking-widest mb-1"
-            style={{ fontFamily: "'Bebas Neue', sans-serif", color: '#e8ff47' }}
+            style={{ color: '#e8ff47' }}
           >
             POWER + PACE
           </h1>
-          <p style={{ fontFamily: "'DM Mono', monospace", color: '#666666', fontSize: '0.75rem' }}>
+          <p style={{ color: '#666666', fontSize: '0.75rem' }}>
             training tracker
           </p>
         </div>
@@ -59,7 +59,6 @@ export default function LoginPage() {
           <div
             className="text-center text-sm p-4 rounded border"
             style={{
-              fontFamily: "'DM Mono', monospace",
               color: '#4aff91',
               borderColor: '#4aff91',
               backgroundColor: 'rgba(74,255,145,0.05)',
@@ -76,8 +75,7 @@ export default function LoginPage() {
                 backgroundColor: '#181818',
                 color: '#d0d0d0',
                 border: '1px solid #181818',
-                fontFamily: "'DM Mono', monospace",
-                fontSize: '0.8rem',
+                  fontSize: '0.8rem',
               }}
             >
               Continue with Google
@@ -85,7 +83,7 @@ export default function LoginPage() {
 
             <div className="flex items-center gap-3">
               <div className="flex-1 h-px" style={{ backgroundColor: '#181818' }} />
-              <span style={{ fontFamily: "'DM Mono', monospace", color: '#666666', fontSize: '0.7rem' }}>
+              <span style={{ color: '#666666', fontSize: '0.7rem' }}>
                 or
               </span>
               <div className="flex-1 h-px" style={{ backgroundColor: '#181818' }} />
@@ -95,7 +93,7 @@ export default function LoginPage() {
               <div className="space-y-1">
                 <Label
                   htmlFor="email"
-                  style={{ fontFamily: "'DM Mono', monospace", color: '#666666', fontSize: '0.7rem' }}
+                  style={{ color: '#666666', fontSize: '0.7rem' }}
                 >
                   email
                 </Label>
@@ -111,13 +109,12 @@ export default function LoginPage() {
                     backgroundColor: '#0f0f0f',
                     border: '1px solid #181818',
                     color: '#d0d0d0',
-                    fontFamily: "'DM Mono', monospace",
-                    fontSize: '0.85rem',
+                          fontSize: '0.85rem',
                   }}
                 />
               </div>
               {error && (
-                <p style={{ fontFamily: "'DM Mono', monospace", color: '#ff6b47', fontSize: '0.7rem' }}>
+                <p style={{ color: '#ff6b47', fontSize: '0.7rem' }}>
                   {error}
                 </p>
               )}
@@ -128,8 +125,7 @@ export default function LoginPage() {
                 style={{
                   backgroundColor: '#e8ff47',
                   color: '#000',
-                  fontFamily: "'DM Mono', monospace",
-                  fontSize: '0.8rem',
+                      fontSize: '0.8rem',
                   fontWeight: 600,
                 }}
               >
