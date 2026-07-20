@@ -25,33 +25,22 @@ export async function GET(request: NextRequest) {
   if ('error' in res) return res.error
   const { program } = res
 
-  const { data: daysRaw } = await supabase
-    .from('workout_days')
-    .select('*')
-    .eq('program_id', program.id)
-  const days = (daysRaw ?? []) as WorkoutDay[]
-
   const dates: string[] = []
   const [sy, sm, sd] = startParam.split('-').map(Number)
   for (let i = 0; i < windowLen; i++) {
     dates.push(localDateKey(new Date(sy, sm - 1, sd + i)))
   }
 
-  const { data: overridesRaw } = await supabase
-    .from('schedule_overrides')
-    .select('date, workout_day_id')
-    .eq('program_id', program.id)
-    .in('date', dates)
-
+  // Three independent reads → parallelize (was sequential: 3 serial round trips).
+  const [{ data: daysRaw }, { data: overridesRaw }, { data: sessionsRaw }] = await Promise.all([
+    supabase.from('workout_days').select('*').eq('program_id', program.id),
+    supabase.from('schedule_overrides').select('date, workout_day_id').eq('program_id', program.id).in('date', dates),
+    supabase.from('sessions').select('date, status').eq('program_id', program.id).in('date', dates),
+  ])
+  const days = (daysRaw ?? []) as WorkoutDay[]
   const overrideByDate = new Map(
     ((overridesRaw ?? []) as Array<{ date: string; workout_day_id: string }>).map((o) => [o.date, o.workout_day_id])
   )
-
-  const { data: sessionsRaw } = await supabase
-    .from('sessions')
-    .select('date, status')
-    .eq('program_id', program.id)
-    .in('date', dates)
   const sessionByDate = new Map(
     ((sessionsRaw ?? []) as Array<{ date: string; status: string }>).map((s) => [s.date, s.status])
   )
