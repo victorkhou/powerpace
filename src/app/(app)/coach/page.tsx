@@ -51,14 +51,16 @@ export default function CoachPage() {
 
       if (!res.ok || !res.body) {
         const body = await res.json().catch(() => ({}))
+        // Prefer the server's message — it names the URL it tried and the
+        // underlying cause, which generic copy hid.
+        const detail = (body as { error?: string }).error
         fail(
-          res.status === 504
-            ? 'The coach took too long to respond. Try again.'
-            : res.status === 502
-              ? 'The coach service is unreachable. Is the sidecar running?'
-              : res.status === 503
-                ? 'The coach is currently disabled.'
-                : (body as { error?: string }).error ?? 'Something went wrong.'
+          detail ??
+            (res.status === 503
+              ? 'The coach is currently disabled.'
+              : res.status === 502
+                ? 'The coach service is unreachable. Is the sidecar running?'
+                : 'Something went wrong.')
         )
         return
       }

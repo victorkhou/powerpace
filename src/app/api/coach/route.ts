@@ -52,10 +52,19 @@ export async function POST(request: NextRequest) {
       signal: AbortSignal.timeout(COACH_TIMEOUT_MS),
     })
   } catch (err) {
-    // Timeout or connection failure reaching the sidecar.
+    // Timeout or connection failure reaching the sidecar. Include the URL we
+    // actually tried and the underlying cause — "unreachable" alone sent us
+    // hunting a healthy sidecar when the real problem was an IPv6 resolution
+    // mismatch (localhost -> ::1) and, separately, a stale client bundle.
     const timedOut = err instanceof Error && err.name === 'TimeoutError'
+    const cause = (err as { cause?: { code?: string } })?.cause?.code
+    console.error('coach proxy failed', { url: COACH_URL, cause, err })
     return NextResponse.json(
-      { error: timedOut ? 'Coach timed out' : 'Coach service unreachable' },
+      {
+        error: timedOut
+          ? `Coach timed out after ${COACH_TIMEOUT_MS / 1000}s (${COACH_URL})`
+          : `Coach unreachable at ${COACH_URL}${cause ? ` (${cause})` : ''}`,
+      },
       { status: timedOut ? 504 : 502 },
     )
   }
