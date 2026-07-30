@@ -1,6 +1,11 @@
 """FastAPI sidecar. Next.js calls POST /coach; this owns all the AI logic.
 
-Run locally:  uvicorn app.main:app --reload --port 8000
+Run locally:  uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
+
+Bind 127.0.0.1 explicitly (uvicorn's default) and point COACH_SERVICE_URL at
+127.0.0.1 too — NOT "localhost". Node resolves localhost to IPv6 ::1 first, so
+an IPv4-only listener makes the Next.js fetch throw ECONNREFUSED, which surfaces
+in the UI as "Coach service unreachable" even though the sidecar is healthy.
 
 Trust model: this service queries Supabase with the service-role key (bypasses
 RLS), so it must NOT be reachable by untrusted callers. Two controls:

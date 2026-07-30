@@ -26,12 +26,17 @@ Fill `.env`:
 - `LANGSMITH_API_KEY` (+ keep `LANGSMITH_TRACING=true`) — from https://smith.langchain.com
 
 On the Next.js side, add to `webapp/.env.local`:
-- `COACH_SERVICE_URL=http://localhost:8000`
+- `COACH_SERVICE_URL=http://127.0.0.1:8000` — use the IPv4 literal, **not**
+  `localhost`. Node resolves `localhost` to IPv6 `::1` first, and the sidecar
+  binds IPv4 only, so `localhost` makes the proxy fetch throw ECONNREFUSED and
+  the UI reports "Coach service unreachable" while the sidecar is perfectly
+  healthy.
+- `COACH_SHARED_SECRET=<same value as agent/.env>` — the sidecar 401s without it.
 
 ## Run
 
 ```bash
-uvicorn app.main:app --reload --port 8000        # sidecar
+uvicorn app.main:app --reload --host 127.0.0.1 --port 8000   # sidecar
 # in another shell, the Next.js app as usual (npm run dev)
 ```
 
