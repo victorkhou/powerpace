@@ -183,6 +183,28 @@ def build_coach(user_id: str, model_id: str | None = None):
     return graph.compile(checkpointer=_checkpointer)
 
 
+def message_text(msg) -> str:
+    """Extract plain text from a message's content.
+
+    Anthropic returns structured content blocks — content can be a str OR a list
+    like [{'type': 'text', 'text': '...'}, {'type': 'tool_use', ...}]. Assuming
+    str silently yields "" for block-form answers, so normalize both shapes here
+    and use this everywhere an answer is read out.
+    """
+    content = getattr(msg, "content", "")
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        parts = []
+        for block in content:
+            if isinstance(block, str):
+                parts.append(block)
+            elif isinstance(block, dict) and isinstance(block.get("text"), str):
+                parts.append(block["text"])
+        return "".join(parts)
+    return ""
+
+
 class CoachLimitError(RuntimeError):
     """Raised when a turn exceeds the agent<->tools recursion limit — i.e. the
     model kept calling tools without converging. Callers should surface a
@@ -224,6 +246,87 @@ async def ask(user_id: str, question: str, thread_id: str | None = None,
     # normally the AI answer, but scan from the end for the last AIMessage with
     # text content to be robust regardless of how the turn ended.
     for msg in reversed(result["messages"]):
-        if isinstance(msg, AIMessage) and isinstance(msg.content, str) and msg.content.strip():
-            return msg.content
-    return result["messages"][-1].content
+        if isinstance(msg, AIMessage):
+            text = message_text(msg)
+            if text.strip():
+                return text
+    return message_text(result["messages"][-1])
+
+
+async def ask_stream(user_id: str, question: str, thread_id: str | None = None,
+                     model_id: str | None = None):
+    """Stream one turn as a sequence of typed events.
+
+    Yields dicts (the HTTP layer serializes them as SSE):
+      {"type": "tool",     "name": str}   — a tool call started
+      {"type": "token",    "text": str}   — a chunk of the answer
+      {"type": "revising"}                — the groundedness guard rejected the
+                                            answer; discard streamed tokens, a
+                                            corrected answer follows
+      {"type": "done",     "answer": str} — final answer (authoritative)
+      {"type": "error",    "code": str}   — bounded failure
+
+    Why "revising" exists: the guard verifies the answer only AFTER the model
+    has produced it, so tokens can already be on screen when it rejects. Rather
+    than hide that, we tell the client to clear and re-stream — which also makes
+    the guard visible instead of silent.
+    """
+    agent = build_coach(user_id, model_id)
+    config = {
+        "configurable": {"thread_id": thread_id or user_id},
+        "recursion_limit": settings.coach_recursion_limit,
+    }
+    seen_attempts = 0
+    final_answer = ""
+    try:
+        async for ev in agent.astream_events(
+            {"messages": [{"role": "user", "content": question}], "grounding_attempts": 0},
+            config,
+            version="v2",
+        ):
+            kind = ev.get("event")
+
+            if kind == "on_tool_start":
+                # A tool call means any text streamed so far was a preamble
+                # ("let me look that up"), not the answer. Tell the client to
+                # drop it so the bubble doesn't mix preamble with the answer.
+                yield {"type": "tool", "name": ev.get("name", "tool"), "reset": True}
+
+            elif kind == "on_chat_model_stream":
+                # CRITICAL: the groundedness judge is also a chat model and also
+                # streams. Without this node filter its verdict text ("...
+                # GROUNDED") is emitted as answer tokens. metadata.langgraph_node
+                # tells us which graph node produced the chunk; only "agent" is
+                # the coach speaking.
+                if ((ev.get("metadata") or {}).get("langgraph_node")) != "agent":
+                    continue
+                chunk = (ev.get("data") or {}).get("chunk")
+                # Chunk content is a list of blocks (text deltas AND tool_use
+                # deltas). message_text keeps only text blocks, so tool-call
+                # JSON never reaches the user as answer tokens.
+                text = message_text(chunk) if chunk is not None else ""
+                if text:
+                    yield {"type": "token", "text": text}
+
+            elif kind == "on_chain_end" and ev.get("name") == "verify":
+                out = (ev.get("data") or {}).get("output") or {}
+                attempts = out.get("grounding_attempts") if isinstance(out, dict) else None
+                if isinstance(attempts, int) and attempts > seen_attempts:
+                    seen_attempts = attempts
+                    yield {"type": "revising"}
+
+            elif kind == "on_chain_end" and ev.get("name") == "LangGraph":
+                out = (ev.get("data") or {}).get("output") or {}
+                msgs = out.get("messages") if isinstance(out, dict) else None
+                if msgs:
+                    for msg in reversed(msgs):
+                        if isinstance(msg, AIMessage):
+                            text = message_text(msg)
+                            if text.strip():
+                                final_answer = text
+                                break
+    except GraphRecursionError:
+        yield {"type": "error", "code": "step_budget_exceeded"}
+        return
+
+    yield {"type": "done", "answer": final_answer}

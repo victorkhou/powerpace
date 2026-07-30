@@ -10,17 +10,18 @@ The Next.js route is the only thing that should set user_id (from the
 authenticated session) — the sidecar cannot re-verify the session, so the
 shared secret is what stops a direct caller from impersonating any user_id.
 """
+import json
 import logging
 import os
 import secrets
 import traceback
 
 from fastapi import Depends, FastAPI, Header, HTTPException
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
 from .config import settings
-from .graph import CoachLimitError, ask
+from .graph import CoachLimitError, ask, ask_stream
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("coach")
@@ -86,3 +87,28 @@ async def coach(req: CoachRequest):
                 content={"error": type(exc).__name__, "detail": str(exc), "trace": traceback.format_exc()},
             )
         return JSONResponse(status_code=500, content={"error": "internal_error"})
+
+
+@app.post("/coach/stream", dependencies=[Depends(verify_caller)])
+async def coach_stream(req: CoachRequest):
+    """Server-Sent Events variant of /coach. Same auth, same kill-switch; emits
+    typed events (tool / token / revising / done / error) so the client can show
+    progress instead of a blank wait. See graph.ask_stream for the event shapes."""
+    if not settings.coach_enabled:
+        return JSONResponse(status_code=503, content={"error": "coach_disabled"})
+
+    async def gen():
+        try:
+            async for ev in ask_stream(req.user_id, req.question, req.thread_id):
+                yield f"data: {json.dumps(ev)}\n\n"
+        except Exception:
+            logger.exception("coach stream failed")
+            # The HTTP status is already 200 by the time streaming starts, so
+            # errors must be delivered in-band as a final event.
+            yield f"data: {json.dumps({'type': 'error', 'code': 'internal_error'})}\n\n"
+
+    return StreamingResponse(
+        gen(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )

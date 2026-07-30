@@ -21,17 +21,24 @@ export async function POST(request: NextRequest) {
   } catch {
     return NextResponse.json({ error: 'invalid JSON body' }, { status: 400 })
   }
-  const { question, threadId } = (body ?? {}) as { question?: unknown; threadId?: unknown }
+  const { question, threadId, stream } = (body ?? {}) as {
+    question?: unknown
+    threadId?: unknown
+    stream?: unknown
+  }
   if (typeof question !== 'string' || !question.trim()) {
     return NextResponse.json({ error: 'question is required' }, { status: 400 })
   }
+  // stream:true proxies the sidecar's SSE endpoint straight through to the
+  // client; otherwise fall back to the buffered JSON response.
+  const wantsStream = stream === true
 
   // user_id comes from the authenticated session, never from the client body.
   // threadId (optional) selects a conversation for multi-turn memory; the
   // sidecar defaults it to user_id when absent.
   let res: Response
   try {
-    res = await fetch(`${COACH_URL}/coach`, {
+    res = await fetch(`${COACH_URL}/coach${wantsStream ? '/stream' : ''}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -57,6 +64,19 @@ export async function POST(request: NextRequest) {
     // Forward the sidecar's status so failures are diagnosable (401/422/503/500)
     // rather than collapsing everything to an opaque 502.
     return NextResponse.json({ error: 'Coach service error' }, { status: res.status })
+  }
+
+  if (wantsStream) {
+    // Pipe the SSE body through unbuffered. No transformation — the sidecar's
+    // event contract is the client's contract.
+    return new Response(res.body, {
+      status: 200,
+      headers: {
+        'Content-Type': 'text/event-stream; charset=utf-8',
+        'Cache-Control': 'no-cache, no-transform',
+        Connection: 'keep-alive',
+      },
+    })
   }
 
   return NextResponse.json(await res.json())
