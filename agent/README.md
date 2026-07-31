@@ -45,8 +45,59 @@ Smoke test (bypasses Next.js auth — uses a real user_id from your DB):
 ```bash
 curl -s localhost:8000/coach \
   -H 'Content-Type: application/json' \
+  -H "x-coach-secret: $COACH_SHARED_SECRET" \
   -d '{"user_id":"<a real user uuid>","question":"What is my bench PR?"}' | jq
 ```
+
+## Deploying (required for a hosted web app)
+
+The sidecar is a **separate service**. A serverless host like Vercel cannot run
+it, and `localhost` inside a serverless function points at that function's own
+container — so a hosted web app must reach the sidecar over a real URL. Without
+`COACH_SERVICE_URL` set, `/api/coach` returns 503 `not_configured` and the coach
+page says so explicitly rather than appearing broken.
+
+A `Dockerfile` is included; it binds `0.0.0.0:$PORT`, which is what container
+hosts inject.
+
+### Railway
+
+1. New Project → **Deploy from GitHub repo** → pick this repo.
+2. Settings → **Root Directory**: `agent` (so it uses `agent/Dockerfile`).
+3. Variables → add: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`,
+   `ANTHROPIC_API_KEY`, `COACH_SHARED_SECRET` (generate a strong one), and
+   optionally `LANGSMITH_*`. **Do not** set `COACH_ENV=development`.
+4. Deploy, then Settings → Networking → **Generate Domain**.
+5. Verify: `curl https://<your-app>.up.railway.app/health` → `{"status":"ok"}`.
+
+### Render
+
+Same idea: New → **Web Service** → this repo → Root Directory `agent`, Runtime
+**Docker**. Add the same env vars. Render provides `PORT` automatically.
+
+### Then point the web app at it
+
+In Vercel → Project → Settings → Environment Variables:
+
+- `COACH_SERVICE_URL` = `https://<your-sidecar-domain>` (no trailing slash)
+- `COACH_SHARED_SECRET` = the **same** value you set on the sidecar
+
+**Redeploy the Vercel app** — env vars are read at build/boot, so an existing
+deployment won't pick them up.
+
+### Deployment notes
+
+- **Keep the sidecar private.** It holds the service-role key (bypasses RLS).
+  The shared secret is the only thing preventing an arbitrary caller from
+  passing any `user_id` and reading another user's data. Never set
+  `COACH_ENV=development` in production — that's the one flag that allows
+  running with auth disabled, and `main.py` otherwise refuses to start.
+- **Conversation memory is per-process.** `MemorySaver` (graph.py) is in-memory,
+  so redeploys, cold starts, and multiple instances all reset the model's
+  recollection. The chat transcript itself is stored client-side and survives.
+  Swap in a Postgres checkpointer if durable memory matters.
+- **Cold starts.** Free tiers idle out; the first question after a while can be
+  slow enough to hit the proxy's 60s timeout. Retrying usually works.
 
 Then open https://smith.langchain.com and watch the trace appear.
 

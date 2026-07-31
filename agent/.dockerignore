@@ -1,0 +1,20 @@
+# Secrets must never enter the image — env vars are injected by the host.
+.env
+.env.*
+!.env.example
+
+# Python caches / local venvs
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+
+# Not needed at runtime
+tests/
+evals/
+README.md
+Dockerfile
+.dockerignore
+check-env.sh
+set-secrets.sh

@@ -22,7 +22,26 @@ export default function CoachPage() {
   const [streamed, setStreamed] = useState('')
   // What the coach is currently doing, e.g. "reading get_personal_record".
   const [status, setStatus] = useState<string | null>(null)
+  // null = still checking whether the sidecar is configured for this env.
+  const [configured, setConfigured] = useState<boolean | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
+
+  // Probe availability once so an unconfigured environment (e.g. a hosted
+  // deploy with no sidecar) says so plainly instead of failing per-question.
+  useEffect(() => {
+    let cancelled = false
+    fetch('/api/coach')
+      .then((r) => (r.ok ? r.json() : { configured: false }))
+      .then((d: { configured?: boolean }) => {
+        if (!cancelled) setConfigured(Boolean(d.configured))
+      })
+      .catch(() => {
+        if (!cancelled) setConfigured(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   // Keep the newest content in view as the conversation and stream grow.
   useEffect(() => {
@@ -176,7 +195,31 @@ export default function CoachPage() {
       </PageHeader>
 
       <div style={{ padding: '14px 16px 0' }}>
-        {messages.length === 0 && !sending ? (
+        {configured === false ? (
+          <div
+            style={{
+              marginTop: 28,
+              padding: '14px 16px',
+              backgroundColor: C.surface,
+              border: `1px solid ${C.warning}`,
+              borderRadius: 4,
+              fontFamily: FONT.mono,
+              fontSize: '0.72rem',
+              color: C.text,
+              lineHeight: 1.6,
+            }}
+          >
+            <div style={{ color: C.warning, marginBottom: 8 }}>coach not configured</div>
+            The AI coach runs as a separate Python service (<code>agent/</code>). This
+            environment has no <code>COACH_SERVICE_URL</code> set, so there is nothing to
+            talk to.
+            <div style={{ marginTop: 10, color: C.muted, fontSize: '0.68rem' }}>
+              Deploy the sidecar, then set <code>COACH_SERVICE_URL</code> and{' '}
+              <code>COACH_SHARED_SECRET</code> in this environment. See{' '}
+              <code>agent/README.md</code>. Locally, run the sidecar on port 8000.
+            </div>
+          </div>
+        ) : messages.length === 0 && !sending ? (
           <div style={{ paddingTop: 28 }}>
             <p style={{ fontFamily: FONT.mono, fontSize: '0.7rem', color: C.mutedDark, textAlign: 'center', marginBottom: 18 }}>
               Ask about your lifts, progress, or program.
@@ -272,8 +315,8 @@ export default function CoachPage() {
               send(input)
             }
           }}
-          placeholder={threadId ? 'ask your coach...' : 'loading...'}
-          disabled={!threadId || sending}
+          placeholder={configured === false ? 'coach not configured' : threadId ? 'ask your coach...' : 'loading...'}
+          disabled={!threadId || sending || configured === false}
           style={{
             flex: 1,
             height: 44,
@@ -289,7 +332,7 @@ export default function CoachPage() {
         />
         <button
           onClick={() => send(input)}
-          disabled={!threadId || sending || !input.trim()}
+          disabled={!threadId || sending || !input.trim() || configured === false}
           style={{
             flex: '0 0 auto',
             minWidth: 64,

@@ -3,17 +3,45 @@ import { getAuthenticatedUser } from '@/lib/api-auth'
 
 // Thin proxy to the Python coach sidecar. All AI logic (LangGraph/LangChain/
 // LangSmith) lives there; this route just authenticates and forwards.
-// The sidecar URL is server-side only — set COACH_SERVICE_URL in .env.local.
-const COACH_URL = process.env.COACH_SERVICE_URL ?? 'http://localhost:8000'
+//
+// COACH_SERVICE_URL is server-side only and has NO default on purpose: the
+// sidecar is a separate deployment, so an unset value means "not configured"
+// rather than "try localhost". Defaulting to localhost made a hosted deploy
+// report `unreachable at http://localhost:8000` — technically true (the
+// serverless container has no sidecar) but it read like a networking bug.
+const COACH_URL = process.env.COACH_SERVICE_URL ?? ''
 // Shared secret the sidecar requires (must match COACH_SHARED_SECRET there).
 const COACH_SECRET = process.env.COACH_SHARED_SECRET ?? ''
 // Cap how long we wait on the sidecar so a hung turn can't pin a connection.
 const COACH_TIMEOUT_MS = 60_000
 
+/**
+ * Availability probe. Lets the page render a clear "not configured" state up
+ * front instead of looking functional until the first question fails.
+ * Deliberately does NOT expose COACH_URL — that's server-side detail.
+ */
+export async function GET() {
+  const auth = await getAuthenticatedUser()
+  if (auth.error) return auth.error
+  return NextResponse.json({ configured: Boolean(COACH_URL) })
+}
+
 export async function POST(request: NextRequest) {
   const auth = await getAuthenticatedUser()
   if (auth.error) return auth.error
   const { user } = auth
+
+  // Fail fast and legibly when the sidecar isn't wired up for this environment.
+  if (!COACH_URL) {
+    return NextResponse.json(
+      {
+        error:
+          'Coach is not configured for this environment. Deploy the sidecar (agent/) and set COACH_SERVICE_URL + COACH_SHARED_SECRET.',
+        code: 'not_configured',
+      },
+      { status: 503 },
+    )
+  }
 
   let body: unknown
   try {
