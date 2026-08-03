@@ -60,20 +60,54 @@ page says so explicitly rather than appearing broken.
 A `Dockerfile` is included; it binds `0.0.0.0:$PORT`, which is what container
 hosts inject.
 
-### Railway
+> Pricing note: verify each host's current terms yourself — they change often.
+> As of this writing Cloud Run has a standing free tier (2M req/mo) but requires
+> a billing account on file; Render offers a free web-service tier that idles
+> out; Railway and Fly.io no longer have a free allowance (~$5/mo floor).
+> Model-provider (Anthropic) usage is billed separately regardless of host.
 
-1. New Project → **Deploy from GitHub repo** → pick this repo.
-2. Settings → **Root Directory**: `agent` (so it uses `agent/Dockerfile`).
-3. Variables → add: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`,
-   `ANTHROPIC_API_KEY`, `COACH_SHARED_SECRET` (generate a strong one), and
-   optionally `LANGSMITH_*`. **Do not** set `COACH_ENV=development`.
-4. Deploy, then Settings → Networking → **Generate Domain**.
-5. Verify: `curl https://<your-app>.up.railway.app/health` → `{"status":"ok"}`.
+### Google Cloud Run (what this project is deployed on)
 
-### Render
+No local Docker needed — Cloud Build builds the image server-side from source.
 
-Same idea: New → **Web Service** → this repo → Root Directory `agent`, Runtime
-**Docker**. Add the same env vars. Render provides `PORT` automatically.
+```bash
+gcloud auth login
+gcloud config set project <YOUR_PROJECT_ID>          # billing must be enabled
+
+# One-time: enable APIs
+gcloud services enable run.googleapis.com cloudbuild.googleapis.com \
+  artifactregistry.googleapis.com
+
+# One-time: grant the default compute service account the build roles.
+# New projects lack these, and `run deploy --source` fails with PERMISSION_DENIED
+# until they're granted. PNUM = your project NUMBER (not the id).
+PNUM=$(gcloud projects describe <YOUR_PROJECT_ID> --format='value(projectNumber)')
+SA="$PNUM-compute@developer.gserviceaccount.com"
+for R in roles/cloudbuild.builds.builder roles/storage.objectViewer \
+         roles/logging.logWriter roles/artifactregistry.writer; do
+  gcloud projects add-iam-policy-binding <YOUR_PROJECT_ID> \
+    --member="serviceAccount:$SA" --role="$R" --condition=None
+done
+
+# Put prod env vars in a YAML file (NOT on the command line). Include
+# SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, ANTHROPIC_API_KEY, a strong
+# COACH_SHARED_SECRET, optionally LANGSMITH_*. Do NOT set COACH_ENV.
+gcloud run deploy powerpace-coach \
+  --source agent \
+  --region us-central1 \
+  --allow-unauthenticated \
+  --env-vars-file /path/to/coach-run-env.yaml \
+  --memory 1Gi --cpu 1 --timeout 120 --max-instances 3
+```
+
+`--allow-unauthenticated` refers to Google IAM (the endpoint is public); the
+sidecar's OWN shared-secret check is what actually gates access. Verify:
+`curl https://<service-url>/health` → `{"status":"ok"}`.
+
+### Render (alternative)
+
+New → **Web Service** → this repo → Root Directory `agent`, Runtime **Docker**.
+Add the same env vars. Render provides `PORT` automatically.
 
 ### Then point the web app at it
 
@@ -96,7 +130,7 @@ deployment won't pick them up.
   so redeploys, cold starts, and multiple instances all reset the model's
   recollection. The chat transcript itself is stored client-side and survives.
   Swap in a Postgres checkpointer if durable memory matters.
-- **Cold starts.** Free tiers idle out; the first question after a while can be
+- **Cold starts.** Scale-to-zero hosts (Cloud Run, Render free) idle out; the first question after a while can be
   slow enough to hit the proxy's 60s timeout. Retrying usually works.
 
 Then open https://smith.langchain.com and watch the trace appear.
