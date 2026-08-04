@@ -51,11 +51,13 @@ curl -s localhost:8000/coach \
 
 ## Deploying (required for a hosted web app)
 
-The sidecar is a **separate service**. A serverless host like Vercel cannot run
-it, and `localhost` inside a serverless function points at that function's own
-container — so a hosted web app must reach the sidecar over a real URL. Without
-`COACH_SERVICE_URL` set, `/api/coach` returns 503 `not_configured` and the coach
-page says so explicitly rather than appearing broken.
+The sidecar is a **separate service**. The web app is hosted on **AWS Amplify**
+(see `amplify.yml`), which builds and serves the Next.js app but cannot run a
+Python process — and `localhost` inside an Amplify SSR function points at that
+function's own container, not at your laptop. So a hosted web app must reach the
+sidecar over a real URL. Without `COACH_SERVICE_URL` set, `/api/coach` returns
+503 `not_configured` and the coach page says so explicitly rather than appearing
+broken.
 
 A `Dockerfile` is included; it binds `0.0.0.0:$PORT`, which is what container
 hosts inject.
@@ -109,15 +111,26 @@ sidecar's OWN shared-secret check is what actually gates access. Verify:
 New → **Web Service** → this repo → Root Directory `agent`, Runtime **Docker**.
 Add the same env vars. Render provides `PORT` automatically.
 
-### Then point the web app at it
+### Then point the web app at it (AWS Amplify)
 
-In Vercel → Project → Settings → Environment Variables:
+Amplify Console → your app → **Hosting → Environment variables** → Manage
+variables → add:
 
-- `COACH_SERVICE_URL` = `https://<your-sidecar-domain>` (no trailing slash)
-- `COACH_SHARED_SECRET` = the **same** value you set on the sidecar
+- `COACH_SERVICE_URL` = `https://<your-cloud-run-url>` (no trailing slash)
+- `COACH_SHARED_SECRET` = the **same** value the sidecar runs with
 
-**Redeploy the Vercel app** — env vars are read at build/boot, so an existing
-deployment won't pick them up.
+Two Amplify-specific gotchas:
+
+1. **Scope matters.** Variables can be set per-branch or for "All branches". If
+   you set them on `main` only, preview branches won't have them.
+2. **You must redeploy.** Env vars are baked in at build time, so saving them
+   does not change the running app — trigger **Redeploy this version** (or push
+   a commit) on the branch you're actually visiting.
+
+Amplify also needs these to reach the *server* runtime, not just the build. They
+are read in a route handler (`src/app/api/coach/route.ts`) which runs
+server-side, so plain (non-`NEXT_PUBLIC_`) variables are correct — never prefix
+these with `NEXT_PUBLIC_`, which would ship the shared secret to the browser.
 
 ### Deployment notes
 
