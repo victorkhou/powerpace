@@ -6,6 +6,7 @@ import { useSessionStore } from '@/store/session-store'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { useActiveProgram } from '@/hooks/use-active-program'
+import { localDateKey } from '@/lib/date'
 import { TemplatesSection } from '@/components/settings/templates-section'
 import { LoadingScreen } from '@/components/layout/page-shell'
 
@@ -15,6 +16,8 @@ export default function SettingsPage() {
   const resetSession = useSessionStore((s) => s.reset)
   const router = useRouter()
   const [weekInput, setWeekInput] = useState('')
+  const [typeInput, setTypeInput] = useState<'A' | 'B'>('A')
+  const [correcting, setCorrecting] = useState(false)
   const [deloadInput, setDeloadInput] = useState('')
   const [volumeInput, setVolumeInput] = useState('')
   const [saving, setSaving] = useState(false)
@@ -22,6 +25,7 @@ export default function SettingsPage() {
   useEffect(() => {
     if (program) {
       setWeekInput(String(program.week_number))
+      setTypeInput(program.week_type === 'B' ? 'B' : 'A')
       setDeloadInput(program.deload_week != null ? String(program.deload_week) : '')
       // Stored as a fraction (0.875); shown as a percentage (87.5).
       setVolumeInput(String(Math.round(program.volume_pct * 1000) / 10))
@@ -33,12 +37,23 @@ export default function SettingsPage() {
     const val = parseInt(weekInput)
     if (isNaN(val) || val < 1) return
     setSaving(true)
+    // Rewrites the week ANCHOR ("this week is N/T"); the week keeps
+    // auto-advancing from the corrected point. `today` is our LOCAL date so
+    // "this week" means the user's Monday, not the server's.
     await fetch('/api/programs/week', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ programId: program.id, weekNumber: val }),
+      body: JSON.stringify({
+        programId: program.id,
+        weekNumber: val,
+        weekType: typeInput,
+        today: localDateKey(),
+      }),
     })
+    // The resolved workout can change with week type — drop in-progress sets.
+    resetSession()
     await refresh()
+    setCorrecting(false)
     setSaving(false)
   }
 
@@ -71,20 +86,6 @@ export default function SettingsPage() {
     setSaving(false)
   }
 
-  async function toggleWeekType() {
-    if (!program) return
-    setSaving(true)
-    const newType = program.week_type === 'A' ? 'B' : 'A'
-    await fetch('/api/programs/week', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ programId: program.id, weekType: newType }),
-    })
-    // Today's workout will change — clear any in-progress set state
-    resetSession()
-    await refresh()
-    setSaving(false)
-  }
 
   async function handleSignOut() {
     resetSession()
@@ -116,51 +117,87 @@ export default function SettingsPage() {
           <div style={{ fontSize: '0.85rem', color: '#d0d0d0', marginBottom: 12 }}>
             {program?.name ?? 'Power + Pace'}
           </div>
-          {/* Week type toggle */}
+          {/* Current week — DERIVED from the program's anchor and today's date,
+              so it advances on its own each Monday. Correction is deliberately
+              secondary: it's only needed if the anchor is off. */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 12 }}>
             <label style={{ fontSize: '0.7rem', color: '#888', flexShrink: 0 }}>
-              week type:
+              this week:
             </label>
-            <button
-              onClick={toggleWeekType}
-              disabled={saving}
+            <span
               style={{
-                padding: '8px 20px',
+                padding: '6px 14px',
                 borderRadius: 4,
                 border: `1px solid ${program?.week_type === 'A' ? '#e8ff47' : '#47c8ff'}`,
-                backgroundColor: program?.week_type === 'A' ? '#e8ff47' : '#47c8ff',
-                color: '#000',
-                  fontSize: '0.85rem',
+                color: program?.week_type === 'A' ? '#e8ff47' : '#47c8ff',
+                fontSize: '0.85rem',
                 fontWeight: 600,
-                cursor: 'pointer',
-                minHeight: 44,
               }}
             >
-              {program?.week_type ?? 'A'}
-            </button>
-            <span style={{ fontSize: '0.65rem', color: '#555' }}>tap to toggle</span>
+              week {program?.week_number ?? 1} · {program?.week_type ?? 'A'}
+            </span>
+            <span style={{ fontSize: '0.6rem', color: '#555' }}>auto · rolls over Monday</span>
           </div>
 
-          {/* Week number */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 12 }}>
-            <label style={{ fontSize: '0.7rem', color: '#888', flexShrink: 0 }}>
-              week #:
-            </label>
-            <input
-              type="number"
-              value={weekInput}
-              onChange={(e) => setWeekInput(e.target.value)}
-              min={1}
-              style={{ width: 56, height: 36, textAlign: 'center', backgroundColor: '#181818', border: '1px solid #333', borderRadius: 4, color: '#d0d0d0', fontSize: '0.85rem' }}
-            />
+          {!correcting ? (
             <button
-              onClick={saveWeek}
-              disabled={saving}
-              style={{ padding: '6px 12px', borderRadius: 4, border: '1px solid #333', backgroundColor: '#181818', color: '#d0d0d0', fontSize: '0.7rem', cursor: 'pointer', minHeight: 36 }}
+              onClick={() => {
+                setWeekInput(String(program?.week_number ?? 1))
+                setTypeInput(program?.week_type ?? 'A')
+                setCorrecting(true)
+              }}
+              style={{ marginTop: 8, background: 'none', border: 'none', color: '#555', fontSize: '0.65rem', cursor: 'pointer', padding: '4px 0', textDecoration: 'underline dotted' }}
             >
-              {saving ? '...' : 'save'}
+              correct current week
             </button>
-          </div>
+          ) : (
+            <div style={{ marginTop: 10, padding: 10, backgroundColor: '#0d0d0d', border: '1px solid #333', borderRadius: 4 }}>
+              <div style={{ fontSize: '0.6rem', color: '#888', marginBottom: 8, lineHeight: 1.5 }}>
+                Set what THIS week should be. Later weeks continue automatically
+                from here.
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                <input
+                  type="number"
+                  value={weekInput}
+                  onChange={(e) => setWeekInput(e.target.value)}
+                  min={1}
+                  aria-label="week number"
+                  style={{ width: 56, height: 36, textAlign: 'center', backgroundColor: '#181818', border: '1px solid #333', borderRadius: 4, color: '#d0d0d0', fontSize: '0.85rem' }}
+                />
+                <button
+                  onClick={() => setTypeInput(typeInput === 'A' ? 'B' : 'A')}
+                  style={{
+                    width: 44,
+                    height: 36,
+                    borderRadius: 4,
+                    border: `1px solid ${typeInput === 'A' ? '#e8ff47' : '#47c8ff'}`,
+                    backgroundColor: typeInput === 'A' ? '#e8ff47' : '#47c8ff',
+                    color: '#000',
+                    fontSize: '0.85rem',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                  }}
+                >
+                  {typeInput}
+                </button>
+                <button
+                  onClick={saveWeek}
+                  disabled={saving}
+                  style={{ padding: '6px 12px', borderRadius: 4, border: '1px solid #4aff91', backgroundColor: '#181818', color: '#4aff91', fontSize: '0.7rem', cursor: 'pointer', minHeight: 36 }}
+                >
+                  {saving ? '...' : 'apply'}
+                </button>
+                <button
+                  onClick={() => setCorrecting(false)}
+                  disabled={saving}
+                  style={{ padding: '6px 12px', borderRadius: 4, border: '1px solid #333', backgroundColor: '#181818', color: '#888', fontSize: '0.7rem', cursor: 'pointer', minHeight: 36 }}
+                >
+                  cancel
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Deload week */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 12 }}>

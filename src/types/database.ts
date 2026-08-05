@@ -121,6 +121,9 @@ export type Database = {
           created_at: string
           current_week: number
           deload_week: number | null
+          week_anchor_date: string | null
+          week_anchor_number: number | null
+          week_anchor_type: string | null
           friday_alt: string
           id: string
           is_active: boolean
@@ -134,6 +137,9 @@ export type Database = {
           created_at?: string
           current_week?: number
           deload_week?: number | null
+          week_anchor_date?: string | null
+          week_anchor_number?: number | null
+          week_anchor_type?: string | null
           friday_alt?: string
           id?: string
           is_active?: boolean
@@ -147,6 +153,9 @@ export type Database = {
           created_at?: string
           current_week?: number
           deload_week?: number | null
+          week_anchor_date?: string | null
+          week_anchor_number?: number | null
+          week_anchor_type?: string | null
           friday_alt?: string
           id?: string
           is_active?: boolean

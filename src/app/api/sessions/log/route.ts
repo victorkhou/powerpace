@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/api-auth'
 import { processLift, diffAutoWeights, sessionVolume, nextFridayAlt, PROGRESSABLE } from '@/lib/progression'
 import { isDateKey, isFriday } from '@/lib/date'
+import { currentWeekOf } from '@/lib/week'
 import { requireProgram } from '@/lib/ownership'
 import type { WorkingWeight } from '@/types/database'
 
@@ -85,11 +86,17 @@ export async function POST(request: NextRequest) {
 
   const parsed = validateLogBody(await request.json())
   if ('error' in parsed) return NextResponse.json({ error: parsed.error }, { status: 400 })
-  const { programId, workoutDayId, date, weekNumber, weekType, fridayAlt, sets, runLogs, notes, isPartial } = parsed.body
+  const { programId, workoutDayId, date, fridayAlt, sets, runLogs, notes, isPartial } = parsed.body
 
   const owned = await requireProgram(supabase, user, programId)
   if ('error' in owned) return owned.error
   const { program } = owned
+
+  // Derive the week from the program's anchor and the session's OWN date rather
+  // than trusting the body. A tab left open across a Monday would otherwise log
+  // a session stamped with last week's number/type, permanently mis-filing it in
+  // history. The client still sends these (older builds do) — they're ignored.
+  const week = currentWeekOf(program, date)
 
   const { data: weightsArrRaw } = await supabase
     .from('working_weights')
@@ -202,7 +209,7 @@ export async function POST(request: NextRequest) {
   // friday_alt is 'A1' | 'A2' by DB check constraint; the generated row type
   // widens it to string, so narrow here (same treatment as week_type).
   const newFridayAlt =
-    isFriday(date) && weekType === 'A' ? nextFridayAlt(program.friday_alt as 'A1' | 'A2') : null
+    isFriday(date) && week.type === 'A' ? nextFridayAlt(program.friday_alt as 'A1' | 'A2') : null
 
   // ── Single atomic write: session + sets + run logs + weight updates +
   // history + friday_alt flip all commit together, or none do. ──
@@ -212,8 +219,8 @@ export async function POST(request: NextRequest) {
         program_id: programId,
         workout_day_id: workoutDayId,
         date,
-        week_number: weekNumber,
-        week_type: weekType,
+        week_number: week.number,
+        week_type: week.type,
         friday_alt: fridayAlt,
         status: isPartial ? 'partial' : 'completed',
         notes: notes || null,

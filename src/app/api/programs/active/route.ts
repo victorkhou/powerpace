@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/api-auth'
 import { seedProgram } from '@/lib/seed'
 import { resolveWorkoutForDate } from '@/lib/resolve-workout'
+import { currentWeekOf } from '@/lib/week'
 import type { Program, WorkoutDay, Exercise, WorkingWeight } from '@/types/database'
 
 export async function GET(request: NextRequest) {
@@ -56,6 +57,12 @@ async function buildResponse(
   const dayOfWeek = clientDow ?? new Date().getDay()
   const todayDate = clientDate ?? new Date().toISOString().split('T')[0]
 
+  // Week number and A/B are DERIVED from the stored anchor, not read from the
+  // stale week_number/week_type columns the user used to bump by hand. Uses the
+  // client's local date so the week rolls over on their Monday.
+  const week = currentWeekOf(program, clientDate)
+  const derivedProgram: Program = { ...program, week_number: week.number, week_type: week.type }
+
   // These four reads are independent — run them concurrently. The exercises
   // read depends on the resolved workout, so it follows.
   const [daysRes, overrideRes, weightsRes, todaySessionRes] = await Promise.all([
@@ -74,7 +81,7 @@ async function buildResponse(
 
   const days = (daysRes.data ?? []) as WorkoutDay[]
   const overrideId = (overrideRes.data as { workout_day_id: string } | null)?.workout_day_id ?? null
-  const todayWorkout = resolveWorkoutForDate(days, dayOfWeek, program, overrideId)
+  const todayWorkout = resolveWorkoutForDate(days, dayOfWeek, derivedProgram, overrideId)
 
   let exercises: Exercise[] = []
   if (todayWorkout?.id) {
@@ -95,7 +102,7 @@ async function buildResponse(
   )
 
   return NextResponse.json({
-    program,
+    program: derivedProgram,
     todayWorkout,
     exercises,
     weights,
