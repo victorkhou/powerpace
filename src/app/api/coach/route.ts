@@ -13,7 +13,11 @@ const COACH_URL = process.env.COACH_SERVICE_URL ?? ''
 // Shared secret the sidecar requires (must match COACH_SHARED_SECRET there).
 const COACH_SECRET = process.env.COACH_SHARED_SECRET ?? ''
 // Cap how long we wait on the sidecar so a hung turn can't pin a connection.
-const COACH_TIMEOUT_MS = 60_000
+// 110s, just under the sidecar's own 120s Cloud Run request timeout: a scaled-
+// to-zero cold start costs ~10s on top of a normal 20-30s turn, and a
+// multi-tool question can add more. At 60s those legitimately-slow turns were
+// killed client-side while the sidecar was still working.
+const COACH_TIMEOUT_MS = 110_000
 
 /**
  * Availability probe. Lets the page render a clear "not configured" state up

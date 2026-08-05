@@ -130,23 +130,72 @@ export default function CoachPage() {
         }
       }
 
-      if (errorCode) {
-        fail(
-          errorCode === 'step_budget_exceeded'
-            ? "The coach couldn't converge on an answer. Try rephrasing."
-            : 'Something went wrong.'
-        )
+      if (errorCode === 'step_budget_exceeded') {
+        fail("The coach couldn't converge on an answer. Try rephrasing.")
         return
       }
+
       const answer = (finalAnswer ?? acc).trim()
-      persist([...withUser, { role: 'coach', content: answer || '(empty response)' }])
+      if (answer) {
+        persist([...withUser, { role: 'coach', content: answer }])
+        return
+      }
+
+      // The stream produced no usable answer. This happens on hosts whose CDN
+      // buffers or truncates SSE (AWS Amplify's SSR layer does), where the
+      // sidecar answers fine but the events never arrive intact. Rather than
+      // discard a real answer, retry once without streaming.
+      setStatus('finishing')
+      const buffered = await askBuffered(trimmed)
+      if (buffered.ok) {
+        persist([...withUser, { role: 'coach', content: buffered.answer }])
+      } else {
+        fail(buffered.error)
+      }
     } catch {
-      fail('Network error. Check your connection.')
+      // Network-level failure of the streaming request — try the buffered path
+      // before giving up, for the same reason as above.
+      try {
+        setStatus('finishing')
+        const buffered = await askBuffered(trimmed)
+        if (buffered.ok) {
+          persist([...withUser, { role: 'coach', content: buffered.answer }])
+        } else {
+          fail(buffered.error)
+        }
+      } catch {
+        fail('Network error. Check your connection.')
+      }
     } finally {
       setSending(false)
       setStreamed('')
       setStatus(null)
     }
+  }
+
+  /** Non-streaming request: one JSON response. Used as the fallback when SSE
+   *  doesn't survive the hosting layer. */
+  async function askBuffered(
+    question: string
+  ): Promise<{ ok: true; answer: string } | { ok: false; error: string }> {
+    const res = await fetch('/api/coach', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ question, threadId }),
+    })
+    const body = (await res.json().catch(() => ({}))) as { answer?: string; error?: string }
+    if (!res.ok) {
+      return {
+        ok: false,
+        error:
+          body.error ??
+          (res.status === 504
+            ? 'The coach timed out. It may be waking up — try again.'
+            : 'Something went wrong.'),
+      }
+    }
+    const answer = (body.answer ?? '').trim()
+    return answer ? { ok: true, answer } : { ok: false, error: 'The coach returned an empty response.' }
   }
 
   function startNewConversation() {
