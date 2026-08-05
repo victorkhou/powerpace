@@ -2,8 +2,19 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { PageHeader } from '@/components/layout/page-shell'
+import { CoachMarkdown } from '@/components/coach/markdown'
 import { useCoachThread, type CoachMessage } from '@/hooks/use-coach-thread'
 import { C, FONT } from '@/lib/theme'
+
+/**
+ * Only the coach's own successful answers are markdown. User questions render
+ * literally (so typing `*` or `_` doesn't become formatting), and error strings
+ * are ours — rendering them as markdown would let a model-supplied detail inject
+ * links or images into the UI.
+ */
+function renderMarkdown(m: CoachMessage): boolean {
+  return m.role === 'coach' && !m.failed
+}
 
 // Starter prompts — these map onto the coach's actual tools (PRs, progression
 // state, volume trend, program rules) so a first-time tap always works.
@@ -355,12 +366,15 @@ export default function CoachPage() {
               <div
                 style={{
                   ...bubbleBase,
+                  // Markdown emits block elements with their own margins, so
+                  // pre-wrap would double every gap. Keep it for plain text.
+                  whiteSpace: renderMarkdown(m) ? 'normal' : bubbleBase.whiteSpace,
                   backgroundColor: m.role === 'user' ? 'rgba(232,255,71,0.08)' : C.surface,
                   border: `1px solid ${m.failed ? C.danger : m.role === 'user' ? C.accentLift : C.border}`,
                   color: m.failed ? C.danger : C.text,
                 }}
               >
-                {m.content}
+                {renderMarkdown(m) ? <CoachMarkdown>{m.content}</CoachMarkdown> : m.content}
               </div>
             </div>
           ))
@@ -377,6 +391,10 @@ export default function CoachPage() {
                 color: streamed ? C.text : C.muted,
               }}
             >
+              {/* Streamed text stays PLAIN. Partial markdown renders badly —
+                  a half-arrived table is a wall of pipes, and formatting would
+                  reflow on every chunk. The persisted message renders formatted
+                  once the turn completes. */}
               {streamed || `${status ?? 'thinking'}...`}
               {streamed && <span style={{ color: C.accentCombo }}>▌</span>}
             </div>
