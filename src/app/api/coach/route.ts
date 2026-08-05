@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/api-auth'
+import { mintCoachToken } from '@/lib/coach-token'
 
 // Thin proxy to the Python coach sidecar. All AI logic (LangGraph/LangChain/
 // LangSmith) lives there; this route just authenticates and forwards.
@@ -20,14 +21,31 @@ const COACH_SECRET = process.env.COACH_SHARED_SECRET ?? ''
 const COACH_TIMEOUT_MS = 110_000
 
 /**
- * Availability probe. Lets the page render a clear "not configured" state up
- * front instead of looking functional until the first question fails.
- * Deliberately does NOT expose COACH_URL — that's server-side detail.
+ * Session bootstrap for the coach page. Returns whether the coach is configured
+ * and, if so, the sidecar URL plus a SHORT-LIVED token the browser uses to call
+ * it directly.
+ *
+ * Why the browser calls the sidecar directly: this app's SSR functions cap
+ * request duration (~30s on Amplify) well below a real multi-tool coach turn
+ * (~50s), so proxying every turn through here cannot work. The URL is therefore
+ * no longer a server-only secret — but COACH_SHARED_SECRET still is. The token
+ * is scoped to this user and expires in minutes, so it can't be used to
+ * impersonate anyone else even if it leaks.
  */
 export async function GET() {
   const auth = await getAuthenticatedUser()
   if (auth.error) return auth.error
-  return NextResponse.json({ configured: Boolean(COACH_URL) })
+  const { user } = auth
+
+  if (!COACH_URL || !COACH_SECRET) {
+    return NextResponse.json({ configured: false })
+  }
+  return NextResponse.json({
+    configured: true,
+    url: COACH_URL,
+    token: mintCoachToken(user.id, COACH_SECRET),
+    userId: user.id,
+  })
 }
 
 export async function POST(request: NextRequest) {

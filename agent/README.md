@@ -131,6 +131,34 @@ Amplify also needs these to reach the *server* runtime, not just the build. They
 are read in a route handler (`src/app/api/coach/route.ts`) which runs
 server-side, so plain (non-`NEXT_PUBLIC_`) variables are correct — never prefix
 these with `NEXT_PUBLIC_`, which would ship the shared secret to the browser.
+`amplify.yml` writes them into `.env.production` at build time because Amplify
+does not inject console variables into the SSR runtime.
+
+Set `COACH_ALLOWED_ORIGINS` on the **sidecar** to your web origin(s),
+comma-separated, e.g. `https://main.xxxx.amplifyapp.com`. Without it the browser
+cannot call the sidecar at all (CORS), and a wildcard would let any site a user
+visits spend their token.
+
+### Why the browser calls the sidecar directly
+
+Amplify's SSR Lambda kills requests at roughly 30s. A real multi-tool coach turn
+takes ~50s (measured: 6 Anthropic calls + 8 Supabase reads = 51s). Proxying every
+turn through `/api/coach` therefore *cannot* work — the platform terminates the
+function while the sidecar is still working, which surfaced as a generic
+"Something went wrong" on the second, more complex question.
+
+So `GET /api/coach` now returns the sidecar URL plus a **short-lived HMAC token**
+(`src/lib/coach-token.ts`, verified by `agent/app/tokens.py` — keep the two in
+sync), and the page calls Cloud Run directly. Properties that matter:
+
+- The browser never receives `COACH_SHARED_SECRET`. It gets a token scoped to one
+  user id that expires in 5 minutes.
+- The sidecar takes `user_id` from the **signed token**, never from the request
+  body — a token holder cannot read another user's data by editing the payload.
+  (Verified: sending a different `user_id` with a valid token returns the token
+  owner's data.)
+- `x-coach-secret` still works for server-to-server callers, which may act as any
+  user id. Only trusted servers hold it.
 
 ### Deployment notes
 

@@ -26,6 +26,9 @@ class Settings(BaseSettings):
     coach_shared_secret: str = ""
     # Kill-switch: set false to disable the LLM path without redeploying.
     coach_enabled: bool = True
+    # Comma-separated browser origins allowed to call this service directly.
+    # Empty disables CORS entirely (server-to-server only).
+    coach_allowed_origins: str = ""
     # Bound the blast radius of one turn on a paid LLM.
     coach_max_tokens: int = 2048          # per-response output cap
     coach_request_timeout: float = 60.0   # seconds per model call

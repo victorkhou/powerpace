@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { PageHeader } from '@/components/layout/page-shell'
 import { useCoachThread, type CoachMessage } from '@/hooks/use-coach-thread'
 import { C, FONT } from '@/lib/theme'
@@ -26,14 +26,34 @@ export default function CoachPage() {
   const [configured, setConfigured] = useState<boolean | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
 
-  // Probe availability once so an unconfigured environment (e.g. a hosted
-  // deploy with no sidecar) says so plainly instead of failing per-question.
+  // Bootstrap: the sidecar URL + a short-lived token so the browser can call it
+  // DIRECTLY. Going through our own API route is not viable — this app's SSR
+  // functions cap request duration (~30s on Amplify) below a real coach turn
+  // (~50s), so the platform killed long requests mid-flight.
+  type Bootstrap = { url: string; token: string; userId: string }
+  const bootstrapRef = useRef<Bootstrap | null>(null)
+
+  const loadBootstrap = useCallback(async (): Promise<Bootstrap | null> => {
+    const r = await fetch('/api/coach')
+    if (!r.ok) throw new Error('bootstrap failed')
+    const d = (await r.json()) as {
+      configured?: boolean
+      url?: string
+      token?: string
+      userId?: string
+    }
+    if (!d.configured || !d.url || !d.token || !d.userId) return null
+    // Trim a trailing slash so `${url}/coach/stream` can't become a double slash.
+    return { url: d.url.replace(/\/$/, ''), token: d.token, userId: d.userId }
+  }, [])
+
   useEffect(() => {
     let cancelled = false
-    fetch('/api/coach')
-      .then((r) => (r.ok ? r.json() : { configured: false }))
-      .then((d: { configured?: boolean }) => {
-        if (!cancelled) setConfigured(Boolean(d.configured))
+    loadBootstrap()
+      .then((b) => {
+        if (cancelled) return
+        bootstrapRef.current = b
+        setConfigured(Boolean(b))
       })
       .catch(() => {
         if (!cancelled) setConfigured(false)
@@ -41,7 +61,7 @@ export default function CoachPage() {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [loadBootstrap])
 
   // Keep the newest content in view as the conversation and stream grow.
   useEffect(() => {
@@ -62,24 +82,43 @@ export default function CoachPage() {
     const fail = (content: string) => persist([...withUser, { role: 'coach', content, failed: true }])
 
     try {
-      const res = await fetch('/api/coach', {
+      // Tokens are short-lived; refresh before every turn so a long-lived tab
+      // never sends an expired one.
+      const boot = await loadBootstrap()
+      bootstrapRef.current = boot
+      if (!boot) {
+        setConfigured(false)
+        fail('Coach is not configured for this environment.')
+        return
+      }
+
+      // Call the sidecar DIRECTLY (not through our API route) so the platform's
+      // SSR request cap doesn't kill long turns.
+      const res = await fetch(`${boot.url}/coach/stream`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ question: trimmed, threadId, stream: true }),
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${boot.token}`,
+        },
+        body: JSON.stringify({
+          user_id: boot.userId,
+          question: trimmed,
+          thread_id: threadId,
+        }),
       })
 
       if (!res.ok || !res.body) {
         const body = await res.json().catch(() => ({}))
-        // Prefer the server's message — it names the URL it tried and the
-        // underlying cause, which generic copy hid.
-        const detail = (body as { error?: string }).error
+        const detail = (body as { error?: string; detail?: string }).error
         fail(
           detail ??
-            (res.status === 503
-              ? 'The coach is currently disabled.'
-              : res.status === 502
-                ? 'The coach service is unreachable. Is the sidecar running?'
-                : 'Something went wrong.')
+            (res.status === 401
+              ? 'Coach rejected the session token. Reload the page and try again.'
+              : res.status === 503
+                ? 'The coach is currently disabled.'
+                : res.status === 422
+                  ? "The coach couldn't converge on an answer. Try rephrasing."
+                  : 'Something went wrong.')
         )
         return
       }
@@ -174,14 +213,20 @@ export default function CoachPage() {
   }
 
   /** Non-streaming request: one JSON response. Used as the fallback when SSE
-   *  doesn't survive the hosting layer. */
+   *  doesn't survive the network path (proxies/extensions can still buffer it).
+   *  Also goes direct to the sidecar, for the same request-duration reason. */
   async function askBuffered(
     question: string
   ): Promise<{ ok: true; answer: string } | { ok: false; error: string }> {
-    const res = await fetch('/api/coach', {
+    const boot = bootstrapRef.current ?? (await loadBootstrap())
+    if (!boot) return { ok: false, error: 'Coach is not configured for this environment.' }
+    const res = await fetch(`${boot.url}/coach`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ question, threadId }),
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${boot.token}`,
+      },
+      body: JSON.stringify({ user_id: boot.userId, question, thread_id: threadId }),
     })
     const body = (await res.json().catch(() => ({}))) as { answer?: string; error?: string }
     if (!res.ok) {
