@@ -6,6 +6,15 @@ frontend:
         - npm ci
     build:
       commands:
+        # Amplify exposes console environment variables to the BUILD container,
+        # but does not inject them into the Next.js SSR runtime. Next only
+        # inlines process.env.* at build time for NEXT_PUBLIC_ vars, and these
+        # are deliberately server-only (COACH_SHARED_SECRET must never reach the
+        # browser). Writing them to .env.production lets Next load them into the
+        # server bundle, which is AWS's documented workaround.
+        # Without this, /api/coach sees an empty COACH_SERVICE_URL and correctly
+        # reports 503 not_configured even though the console has the values set.
+        - "env | grep -e '^COACH_SERVICE_URL=' -e '^COACH_SHARED_SECRET=' >> .env.production || echo 'warning: COACH_* env vars not found in build environment'"
         - npm run build
   artifacts:
     baseDirectory: .next
